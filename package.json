@@ -6,8 +6,7 @@
   "scripts": {
     "dev": "EXPO_NO_TELEMETRY=1 expo start",
     "build:web": "expo export --platform web",
-    "lint": "expo lint",
-    "install": "npm install --legacy-peer-deps"
+    "lint": "expo lint"
   },
   "dependencies": {
     "@expo-google-fonts/inter": "^0.2.3",
@@ -31,7 +30,7 @@
     "expo-symbols": "~0.4.3",
     "expo-system-ui": "~5.0.5",
     "expo-web-browser": "~14.1.5",
-    "lucide-react-native": "^0.468.0",
+    "lucide-react-native": "^0.476.0",
     "react": "19.0.0",
     "react-dom": "19.0.0",
     "react-native": "0.79.1",
