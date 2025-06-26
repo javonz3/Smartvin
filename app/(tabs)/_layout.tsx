@@ -23,6 +23,7 @@ export default function TabLayout() {
         name="index"
         options={{
           title: 'VIN Lookup',
+          href: '/(tabs)',
           tabBarIcon: ({ size, color }) => (
             <Search size={size} color={color} />
           ),
@@ -32,6 +33,7 @@ export default function TabLayout() {
         name="history"
         options={{
           title: 'History',
+          href: '/(tabs)/history',
           tabBarIcon: ({ size, color }) => (
             <History size={size} color={color} />
           ),
@@ -41,6 +43,7 @@ export default function TabLayout() {
         name="analytics"
         options={{
           title: 'Analytics',
+          href: '/(tabs)/analytics',
           tabBarIcon: ({ size, color }) => (
             <BarChart3 size={size} color={color} />
           ),
@@ -50,6 +53,7 @@ export default function TabLayout() {
         name="more"
         options={{
           title: 'More',
+          href: '/(tabs)/more',
           tabBarIcon: ({ size, color }) => (
             <Menu size={size} color={color} />
           ),
@@ -59,6 +63,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
+          href: '/(tabs)/profile',
           tabBarIcon: ({ size, color }) => (
             <User size={size} color={color} />
           ),
