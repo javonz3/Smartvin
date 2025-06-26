@@ -63,18 +63,13 @@ export async function GET(request: Request, { vin }: { vin: string }) {
 
   try {
     console.log('[VIN API] Step 1: Authenticating with VIN Data API...');
-    console.log('[VIN API] Using credentials:', {
-      secret_key: SECRET_KEY ? `${SECRET_KEY.substring(0, 8)}...` : 'MISSING',
-      username: USERNAME || 'MISSING',
-      password: PASSWORD ? '***' : 'MISSING'
-    });
     
-    // Step 1: Get authentication token
-    // Based on docs: https://vdpvin.docs.apiary.io/#reference/0/authentication/get-token
+    // IMPORTANT: Properly handle special characters in credentials
+    // The password contains special characters like # which need to be preserved
     const authPayload = {
-      secret_key: SECRET_KEY,
-      username: USERNAME,
-      password: PASSWORD
+      secret_key: SECRET_KEY.trim(),
+      username: USERNAME.trim(),
+      password: PASSWORD.trim() // Keep the full password including special characters
     };
     
     console.log('[VIN API] Authentication payload structure:', {
@@ -83,9 +78,12 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       hasPassword: !!authPayload.password,
       secretKeyLength: authPayload.secret_key?.length,
       usernameLength: authPayload.username?.length,
-      passwordLength: authPayload.password?.length
+      passwordLength: authPayload.password?.length,
+      passwordPreview: authPayload.password ? `${authPayload.password.substring(0, 8)}...` : 'MISSING'
     });
     
+    // Step 1: Get authentication token
+    // Based on docs: https://vdpvin.docs.apiary.io/#reference/0/authentication/get-token
     const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
       method: 'POST',
       headers: {
@@ -93,6 +91,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         'Accept': 'application/json',
         'User-Agent': 'SmartVIN-App/1.0'
       },
+      // Use JSON.stringify to properly encode special characters
       body: JSON.stringify(authPayload)
     });
 
@@ -118,11 +117,17 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         status: tokenResponse.status,
         statusText: tokenResponse.statusText,
         response: responseText,
-        errorData
+        errorData,
+        credentialsUsed: {
+          secretKey: SECRET_KEY ? `${SECRET_KEY.substring(0, 8)}...` : 'MISSING',
+          username: USERNAME || 'MISSING',
+          passwordLength: PASSWORD?.length || 0,
+          passwordHasSpecialChars: PASSWORD ? /[^a-zA-Z0-9]/.test(PASSWORD) : false
+        }
       });
       
       if (tokenResponse.status === 401 || tokenResponse.status === 403) {
-        errorMessage = 'Invalid credentials. Please verify your VIN Data API secret key, username, and password are correct.';
+        errorMessage = 'Invalid credentials. Please verify your VIN Data API secret key, username, and password are correct. Note: Special characters in passwords must be exact.';
       } else if (tokenResponse.status === 429) {
         errorMessage = 'Too many authentication requests. Please wait a moment and try again.';
       } else if (tokenResponse.status === 400) {
@@ -135,7 +140,12 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         message: errorMessage,
         debug: {
           status: tokenResponse.status,
-          response: responseText
+          response: responseText,
+          credentialsCheck: {
+            hasAllCredentials: !!(SECRET_KEY && USERNAME && PASSWORD),
+            passwordLength: PASSWORD?.length || 0,
+            passwordHasSpecialChars: PASSWORD ? /[^a-zA-Z0-9]/.test(PASSWORD) : false
+          }
         }
       }), {
         status: tokenResponse.status,
