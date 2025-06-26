@@ -86,6 +86,8 @@ export default function VINLookup() {
   };
 
   const handleLookup = async () => {
+    console.log('Starting VIN lookup process...');
+    
     // Check if user can perform VIN lookup
     const permission = await canPerformAction('vin_lookup');
     if (!permission.allowed) {
@@ -118,10 +120,15 @@ export default function VINLookup() {
     setLoading(true);
 
     try {
+      console.log('Decoding VIN:', vin);
+      
       // First, decode the VIN to get vehicle data
       const vinResult = await VINApiService.decodeVIN(vin);
       
+      console.log('VIN decode result:', vinResult);
+      
       if (!vinResult.success) {
+        console.error('VIN decode failed:', vinResult.error, vinResult.message);
         Alert.alert(
           'VIN Decode Error', 
           vinResult.message || 'Unable to decode VIN. Please verify the VIN is correct.'
@@ -129,8 +136,21 @@ export default function VINLookup() {
         return;
       }
 
+      if (!vinResult.data) {
+        console.error('No vehicle data returned');
+        Alert.alert(
+          'No Vehicle Data',
+          'No vehicle information found for this VIN. Please verify the VIN is correct.'
+        );
+        return;
+      }
+
+      console.log('Vehicle data retrieved:', vinResult.data);
+
       // Record usage (this will handle pay-per-request credits and free tier limits)
       await recordUsage('vin_lookup');
+
+      console.log('Navigating to valuation page...');
 
       // Navigate to valuation results with the decoded vehicle data
       router.push({
