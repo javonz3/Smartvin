@@ -32,9 +32,11 @@ A comprehensive mobile application for vehicle dealers and professionals to get 
    cp .env.example .env
    ```
 
-4. Add your API keys to `.env`:
+4. Add your API credentials to `.env`:
    ```
    EXPO_PUBLIC_VDP_API_KEY=your_vindata_secret_key
+   EXPO_PUBLIC_VDP_USERNAME=your_vindata_username
+   EXPO_PUBLIC_VDP_PASSWORD=your_vindata_password
    EXPO_PUBLIC_OPENAI_API_KEY=your_openai_api_key
    ```
 
@@ -42,14 +44,20 @@ A comprehensive mobile application for vehicle dealers and professionals to get 
 
 #### VIN Data API
 - Sign up at: https://vindata.com
-- Navigate to your dashboard to get your **secret key** (not API key)
+- Navigate to your dashboard to get your credentials:
+  - **Secret Key** (`secret_key`)
+  - **Username** (`username`) 
+  - **Password** (`password`)
 - API Documentation: https://vdpvin.docs.apiary.io/
-- Add to `EXPO_PUBLIC_VDP_API_KEY` in `.env`
+- Add all three credentials to your `.env` file
 
-**Important**: The VIN Data API uses Bearer token authentication. You need your **secret key** from the dashboard, which is used to obtain authentication tokens.
+**Important**: The VIN Data API requires three authentication parameters:
+- `secret_key`: Your API secret key from the dashboard
+- `username`: Your VIN Data username
+- `password`: Your VIN Data password
 
 **Authentication Flow**:
-1. POST to `/token` endpoint with your `secret_key` to get a Bearer token
+1. POST to `/token` endpoint with `secret_key`, `username`, and `password` to get a Bearer token
 2. Use the Bearer token in the `Authorization` header for VIN requests
 3. Tokens expire after 1 hour and need to be refreshed
 
@@ -80,12 +88,16 @@ The app uses the VIN Data API for vehicle data retrieval:
 
 #### Authentication Process
 
-1. **Get Token**: POST to `/token` with your secret key
+1. **Get Token**: POST to `/token` with your credentials
    ```typescript
    const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
      method: 'POST',
      headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({ secret_key: YOUR_SECRET_KEY })
+     body: JSON.stringify({ 
+       secret_key: YOUR_SECRET_KEY,
+       username: YOUR_USERNAME,
+       password: YOUR_PASSWORD
+     })
    });
    ```
 
@@ -106,7 +118,13 @@ The app uses the VIN Data API for vehicle data retrieval:
 
 ### Testing API Integration
 
-1. Add your VIN Data secret key to `.env`
+1. Add your VIN Data credentials to `.env`:
+   ```
+   EXPO_PUBLIC_VDP_API_KEY=your_secret_key
+   EXPO_PUBLIC_VDP_USERNAME=your_username
+   EXPO_PUBLIC_VDP_PASSWORD=your_password
+   ```
+
 2. Use the built-in API key validation:
    ```typescript
    import { VINApiService } from '@/services/vinApi';
@@ -149,7 +167,9 @@ services/
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `EXPO_PUBLIC_VDP_API_KEY` | VIN Data secret key (not API key) | Yes |
+| `EXPO_PUBLIC_VDP_API_KEY` | VIN Data secret key | Yes |
+| `EXPO_PUBLIC_VDP_USERNAME` | VIN Data username | Yes |
+| `EXPO_PUBLIC_VDP_PASSWORD` | VIN Data password | Yes |
 | `EXPO_PUBLIC_OPENAI_API_KEY` | OpenAI API key for AI valuations | Yes |
 | `EXPO_PUBLIC_API_URL` | VIN Data API base URL | No |
 
@@ -207,7 +227,7 @@ Test with these sample VINs:
 
 The VIN API service includes comprehensive error handling:
 - Network connectivity issues
-- Invalid secret keys
+- Invalid credentials
 - Malformed VINs
 - Rate limiting (100 requests/minute)
 - Token expiration (1 hour)
@@ -235,15 +255,17 @@ eas build --platform all
 
 ### Common Issues
 
-1. **"API key not configured"**
-   - Ensure `.env` file exists with `EXPO_PUBLIC_VDP_API_KEY`
-   - Use your **secret key** from VIN Data dashboard, not API key
+1. **"API credentials not configured"**
+   - Ensure `.env` file exists with all three VIN Data credentials:
+     - `EXPO_PUBLIC_VDP_API_KEY` (secret key)
+     - `EXPO_PUBLIC_VDP_USERNAME` (username)
+     - `EXPO_PUBLIC_VDP_PASSWORD` (password)
    - Restart the development server after adding environment variables
 
 2. **"Authentication failed"**
-   - Verify you're using the secret key, not API key
-   - Check your VIN Data dashboard for the correct secret key
-   - Ensure the secret key hasn't expired
+   - Verify all three credentials are correct
+   - Check your VIN Data dashboard for the correct values
+   - Ensure credentials haven't expired or been changed
 
 3. **"Invalid VIN format"**
    - VINs must be exactly 17 characters
@@ -256,9 +278,9 @@ eas build --platform all
    - Check for firewall/proxy issues
 
 5. **"API Error: 401"**
-   - Invalid secret key
+   - Invalid credentials (secret key, username, or password)
    - Token has expired (tokens last 1 hour)
-   - Check your VIN Data dashboard for the correct secret key
+   - Check your VIN Data dashboard for the correct credentials
 
 6. **"API Error: 429"**
    - Rate limit exceeded (100 requests/minute)
@@ -268,15 +290,16 @@ eas build --platform all
 7. **"Token expired"**
    - Tokens automatically expire after 1 hour
    - The app will automatically request a new token
-   - If issues persist, check your secret key
+   - If issues persist, check your credentials
 
-### API Key vs Secret Key
+### VIN Data Credentials
 
-**Important**: VIN Data uses two different credentials:
-- **API Key**: Used for some legacy endpoints
-- **Secret Key**: Used for Bearer token authentication (what you need)
+**Important**: VIN Data requires three authentication parameters:
+1. **Secret Key**: Found in your VIN Data dashboard
+2. **Username**: Your VIN Data account username
+3. **Password**: Your VIN Data account password
 
-Make sure you're using the **secret key** from your VIN Data dashboard.
+All three are required for the authentication token request.
 
 ### API Key Validation
 

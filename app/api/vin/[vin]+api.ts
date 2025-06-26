@@ -1,11 +1,13 @@
 export async function GET(request: Request, { vin }: { vin: string }) {
   const SECRET_KEY = process.env.EXPO_PUBLIC_VDP_API_KEY;
+  const USERNAME = process.env.EXPO_PUBLIC_VDP_USERNAME;
+  const PASSWORD = process.env.EXPO_PUBLIC_VDP_PASSWORD;
   
-  if (!SECRET_KEY) {
+  if (!SECRET_KEY || !USERNAME || !PASSWORD) {
     return new Response(JSON.stringify({
       success: false,
-      error: 'API key not configured',
-      message: 'VDP API key is missing from environment variables'
+      error: 'API credentials not configured',
+      message: 'VDP API credentials (secret_key, username, password) are missing from environment variables'
     }), {
       status: 500,
       headers: {
@@ -45,14 +47,16 @@ export async function GET(request: Request, { vin }: { vin: string }) {
   }
 
   try {
-    // Step 1: Get authentication token
+    // Step 1: Get authentication token with all required credentials
     const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        secret_key: SECRET_KEY
+        secret_key: SECRET_KEY,
+        username: USERNAME,
+        password: PASSWORD
       })
     });
 
@@ -60,7 +64,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       let errorMessage = 'Failed to authenticate with VIN service';
       
       if (tokenResponse.status === 401 || tokenResponse.status === 403) {
-        errorMessage = 'Invalid API key. Please check your VIN Data API credentials.';
+        errorMessage = 'Invalid credentials. Please check your VIN Data API secret key, username, and password.';
       } else if (tokenResponse.status === 429) {
         errorMessage = 'Too many authentication requests. Please wait a moment and try again.';
       }
@@ -117,7 +121,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
           if (vinResponse.status === 404) {
             errorMessage = 'No vehicle data found for this VIN number.';
           } else if (vinResponse.status === 401 || vinResponse.status === 403) {
-            errorMessage = 'Authentication failed with the VIN service. Please check your API key.';
+            errorMessage = 'Authentication failed with the VIN service. Please check your API credentials.';
           } else if (vinResponse.status === 429) {
             errorMessage = 'Too many requests. Please wait a moment and try again.';
           } else {
