@@ -50,7 +50,7 @@ export class VINApiService {
     }
 
     try {
-      console.log(`Making VIN API request for: ${vin}`);
+      console.log(`[VINApiService] Making VIN API request for: ${vin}`);
       
       // Use the local API route which will proxy to the external service
       const response = await fetch(`${this.BASE_URL}/${vin}`, {
@@ -61,7 +61,7 @@ export class VINApiService {
         }
       });
 
-      console.log(`VIN API response status: ${response.status}`);
+      console.log(`[VINApiService] VIN API response status: ${response.status}`);
 
       if (!response.ok) {
         let errorMessage = `API Error: ${response.status}`;
@@ -69,7 +69,7 @@ export class VINApiService {
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorData.error || errorMessage;
-          console.error('VIN API Error Response:', errorData);
+          console.error('[VINApiService] VIN API Error Response:', errorData);
         } catch {
           // If we can't parse error response, use status text
           errorMessage = `${response.status}: ${response.statusText}`;
@@ -83,7 +83,7 @@ export class VINApiService {
       }
 
       const result = await response.json();
-      console.log('VIN API Success Response:', result);
+      console.log('[VINApiService] VIN API Success Response:', result);
       
       // Check if the response contains vehicle data
       if (!result.success) {
@@ -100,7 +100,7 @@ export class VINApiService {
       };
 
     } catch (error) {
-      console.error('VIN API Network Error:', error);
+      console.error('[VINApiService] VIN API Network Error:', error);
       
       if (error instanceof TypeError && error.message.includes('fetch')) {
         return {
@@ -119,7 +119,7 @@ export class VINApiService {
   }
 
   private static transformVDPData(rawData: any): VDPVehicleData {
-    console.log('Transforming VDP data:', rawData);
+    console.log('[VINApiService] Transforming VDP data:', rawData);
     
     // Transform VDP API response according to their documented structure
     return {
@@ -268,11 +268,10 @@ export class VINApiService {
     message: string;
   }> {
     try {
-      console.log('Validating API key...');
+      console.log('[VINApiService] Validating API key...');
       
-      // Test with a known valid VIN
-      const testVin = '1HGBH41JXMN109186'; // Honda Civic test VIN
-      const response = await fetch(`${this.BASE_URL}/${testVin}`, {
+      // Use the test credentials endpoint
+      const response = await fetch('/api/test-credentials', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -280,36 +279,16 @@ export class VINApiService {
         }
       });
 
-      console.log(`API validation response status: ${response.status}`);
+      console.log(`[VINApiService] API validation response status: ${response.status}`);
 
-      if (response.status === 401 || response.status === 403) {
-        return {
-          valid: false,
-          message: 'Invalid API key or insufficient permissions'
-        };
-      }
-
-      if (response.status === 429) {
-        return {
-          valid: true,
-          message: 'API key valid but rate limit exceeded'
-        };
-      }
-
-      if (response.ok) {
-        const result = await response.json();
-        return {
-          valid: result.success,
-          message: result.success ? 'API key is valid and working' : result.message || 'API key validation failed'
-        };
-      }
+      const result = await response.json();
 
       return {
-        valid: false,
-        message: `API returned status ${response.status}`
+        valid: result.success,
+        message: result.message || 'API validation completed'
       };
     } catch (error) {
-      console.error('API validation error:', error);
+      console.error('[VINApiService] API validation error:', error);
       return {
         valid: false,
         message: 'Unable to validate API key - network error'

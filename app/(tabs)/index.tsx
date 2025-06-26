@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, Scan, Car, MapPin, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react-native';
+import { Camera, Scan, Car, MapPin, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Settings } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { VINScanner } from '@/components/VINScanner';
 import { PaywallModal } from '@/components/PaywallModal';
@@ -34,6 +34,7 @@ export default function VINLookup() {
     message?: string;
   }>({ isValid: false });
   const [showPaywall, setShowPaywall] = useState(false);
+  const [testingCredentials, setTestingCredentials] = useState(false);
 
   const { 
     subscriptionStatus, 
@@ -95,6 +96,39 @@ export default function VINLookup() {
   const useSampleVIN = (sampleVin: string) => {
     setVin(sampleVin);
     validateVIN(sampleVin);
+  };
+
+  const testCredentials = async () => {
+    setTestingCredentials(true);
+    try {
+      console.log('Testing VIN Data API credentials...');
+      
+      const response = await fetch('/api/test-credentials');
+      const result = await response.json();
+      
+      if (result.success) {
+        Alert.alert(
+          'Credentials Valid ✅',
+          'Your VIN Data API credentials are working correctly!',
+          [{ text: 'OK' }]
+        );
+      } else {
+        Alert.alert(
+          'Credentials Invalid ❌',
+          `${result.message}\n\nPlease check your .env file and ensure all three credentials are correct:\n• EXPO_PUBLIC_VDP_API_KEY\n• EXPO_PUBLIC_VDP_USERNAME\n• EXPO_PUBLIC_VDP_PASSWORD`,
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error) {
+      console.error('Credential test error:', error);
+      Alert.alert(
+        'Test Failed',
+        'Unable to test credentials. Please check your internet connection.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setTestingCredentials(false);
+    }
   };
 
   const handleLookup = async () => {
@@ -213,8 +247,23 @@ export default function VINLookup() {
         colors={['#3b82f6', '#1d4ed8']}
         style={styles.header}
       >
-        <Text style={styles.headerTitle}>SmartVIN</Text>
-        <Text style={styles.headerSubtitle}>AI-Powered Vehicle Valuation</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.headerTitle}>SmartVIN</Text>
+          <Text style={styles.headerSubtitle}>AI-Powered Vehicle Valuation</Text>
+        </View>
+        
+        {/* Test Credentials Button */}
+        <TouchableOpacity 
+          style={styles.testButton} 
+          onPress={testCredentials}
+          disabled={testingCredentials}
+        >
+          {testingCredentials ? (
+            <ActivityIndicator size="small" color="#ffffff" />
+          ) : (
+            <Settings size={20} color="#ffffff" />
+          )}
+        </TouchableOpacity>
       </LinearGradient>
 
       {/* Centered Usage Banner */}
@@ -423,6 +472,13 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingVertical: 30,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  headerContent: {
+    flex: 1,
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 28,
@@ -436,6 +492,14 @@ const createStyles = (theme: any) => StyleSheet.create({
     color: '#e0e7ff',
     textAlign: 'center',
     marginTop: 4,
+  },
+  testButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   bannerContainer: {
     paddingTop: 16,
