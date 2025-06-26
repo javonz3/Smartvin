@@ -10,34 +10,56 @@ export async function GET(request: Request) {
     hasPassword: !!PASSWORD,
     passwordLength: PASSWORD?.length || 0,
     passwordPreview: PASSWORD ? `${PASSWORD.substring(0, 8)}...` : 'MISSING',
-    passwordFull: PASSWORD, // TEMPORARY: Full password for debugging
+    expectedPassword: 'Smooth1one.23',
+    passwordMatches: PASSWORD === 'Smooth1one.23',
+    containsPeriod: PASSWORD ? PASSWORD.includes('.') : false,
     containsHashtag: PASSWORD ? PASSWORD.includes('#') : false,
     containsSpecialChars: PASSWORD ? /[^a-zA-Z0-9]/.test(PASSWORD) : false,
-    charCodes: PASSWORD ? Array.from(PASSWORD).map(char => `${char}(${char.charCodeAt(0)})`).join(' ') : 'N/A'
+    actualPassword: PASSWORD // TEMPORARY: For debugging only
   });
+  
+  // Check if all credentials are present
+  if (!SECRET_KEY || !USERNAME || !PASSWORD) {
+    return new Response(JSON.stringify({
+      success: false,
+      message: 'Missing credentials in environment variables',
+      debug: {
+        hasSecretKey: !!SECRET_KEY,
+        hasUsername: !!USERNAME,
+        hasPassword: !!PASSWORD,
+        note: 'Please check your .env file'
+      }
+    }), {
+      status: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      },
+    });
+  }
   
   // Test the actual authentication payload
   const authPayload = {
-    secret_key: SECRET_KEY?.trim(),
-    username: USERNAME?.trim(),
-    password: PASSWORD?.trim()
+    secret_key: SECRET_KEY.trim(),
+    username: USERNAME.trim(),
+    password: PASSWORD.trim()
   };
   
-  console.log('[Test Credentials] Auth payload:', {
-    secret_key: authPayload.secret_key ? `${authPayload.secret_key.substring(0, 8)}...` : 'MISSING',
-    username: authPayload.username || 'MISSING',
-    password: authPayload.password || 'MISSING', // TEMPORARY: Full password for debugging
-    passwordInPayload: authPayload.password?.includes('#') ? 'Contains #' : 'No # found'
+  console.log('[Test Credentials] Auth payload structure:', {
+    secret_key_length: authPayload.secret_key?.length,
+    username_length: authPayload.username?.length,
+    password_length: authPayload.password?.length,
+    password_preview: authPayload.password ? `${authPayload.password.substring(0, 8)}...` : 'MISSING'
   });
   
   // Test JSON stringification
   const jsonPayload = JSON.stringify(authPayload);
-  console.log('[Test Credentials] JSON payload:', jsonPayload);
-  console.log('[Test Credentials] JSON contains hashtag:', jsonPayload.includes('#'));
+  console.log('[Test Credentials] JSON payload preview:', jsonPayload.substring(0, 100) + '...');
+  console.log('[Test Credentials] JSON contains period:', jsonPayload.includes('.'));
   
   // Test actual API call
   try {
-    console.log('[Test Credentials] Testing actual API call...');
+    console.log('[Test Credentials] Testing authentication with VIN Data API...');
     
     const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
       method: 'POST',
@@ -53,24 +75,38 @@ export async function GET(request: Request) {
     console.log('[Test Credentials] API Response:', {
       status: tokenResponse.status,
       statusText: tokenResponse.statusText,
-      response: responseText
+      responseLength: responseText.length,
+      responsePreview: responseText.substring(0, 200)
     });
     
+    let responseData = null;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (e) {
+      console.log('[Test Credentials] Response is not valid JSON');
+    }
+    
+    const isSuccess = tokenResponse.ok && responseData?.token;
+    
     return new Response(JSON.stringify({
-      success: tokenResponse.ok,
-      message: tokenResponse.ok ? 'Credentials are valid!' : 'Authentication failed',
+      success: isSuccess,
+      message: isSuccess 
+        ? '✅ Credentials are valid! Authentication successful.' 
+        : `❌ Authentication failed: ${responseData?.message || responseText || 'Unknown error'}`,
       debug: {
         status: tokenResponse.status,
-        response: responseText,
-        credentialsCheck: {
-          hasSecretKey: !!SECRET_KEY,
-          hasUsername: !!USERNAME,
-          hasPassword: !!PASSWORD,
-          passwordLength: PASSWORD?.length || 0,
-          passwordContainsHashtag: PASSWORD?.includes('#') || false,
-          passwordPreview: PASSWORD ? `${PASSWORD.substring(0, 8)}...` : 'MISSING',
-          jsonPayloadContainsHashtag: jsonPayload.includes('#')
-        }
+        statusText: tokenResponse.statusText,
+        hasToken: !!responseData?.token,
+        tokenType: responseData?.token ? typeof responseData.token : 'none',
+        expiresIn: responseData?.expires_in,
+        credentialsUsed: {
+          secretKeyLength: SECRET_KEY.length,
+          usernameLength: USERNAME.length,
+          passwordLength: PASSWORD.length,
+          passwordCorrect: PASSWORD === 'Smooth1one.23',
+          passwordActual: PASSWORD // TEMPORARY: Remove in production
+        },
+        rawResponse: responseText.substring(0, 500)
       }
     }), {
       status: 200,
@@ -81,20 +117,19 @@ export async function GET(request: Request) {
     });
     
   } catch (error) {
-    console.error('[Test Credentials] Error:', error);
+    console.error('[Test Credentials] Network Error:', error);
     
     return new Response(JSON.stringify({
       success: false,
-      message: 'Network error during test',
+      message: '❌ Network error during authentication test',
       error: error instanceof Error ? error.message : 'Unknown error',
       debug: {
-        credentialsCheck: {
+        errorType: error?.constructor?.name,
+        credentialsPresent: {
           hasSecretKey: !!SECRET_KEY,
           hasUsername: !!USERNAME,
           hasPassword: !!PASSWORD,
-          passwordLength: PASSWORD?.length || 0,
-          passwordContainsHashtag: PASSWORD?.includes('#') || false,
-          passwordPreview: PASSWORD ? `${PASSWORD.substring(0, 8)}...` : 'MISSING'
+          passwordLength: PASSWORD?.length || 0
         }
       }
     }), {
