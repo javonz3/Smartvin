@@ -34,7 +34,9 @@ export interface VDPApiResponse {
 }
 
 export class VINApiService {
-  private static readonly BASE_URL = 'https://api.vindataproject.com/api/vin';
+  private static readonly BASE_URL = process.env.EXPO_PUBLIC_API_URL 
+    ? `${process.env.EXPO_PUBLIC_API_URL}/api/vin`
+    : 'https://api.vindataproject.com/api/vin';
   private static readonly API_KEY = process.env.EXPO_PUBLIC_VDP_API_KEY;
 
   static async decodeVIN(vin: string): Promise<VDPApiResponse> {
