@@ -63,48 +63,80 @@ export async function GET(request: Request, { vin }: { vin: string }) {
 
   try {
     console.log('[VIN API] Step 1: Authenticating with VIN Data API...');
+    console.log('[VIN API] Using credentials:', {
+      secret_key: SECRET_KEY ? `${SECRET_KEY.substring(0, 8)}...` : 'MISSING',
+      username: USERNAME || 'MISSING',
+      password: PASSWORD ? '***' : 'MISSING'
+    });
     
     // Step 1: Get authentication token
     // Based on docs: https://vdpvin.docs.apiary.io/#reference/0/authentication/get-token
+    const authPayload = {
+      secret_key: SECRET_KEY,
+      username: USERNAME,
+      password: PASSWORD
+    };
+    
+    console.log('[VIN API] Authentication payload structure:', {
+      hasSecretKey: !!authPayload.secret_key,
+      hasUsername: !!authPayload.username,
+      hasPassword: !!authPayload.password,
+      secretKeyLength: authPayload.secret_key?.length,
+      usernameLength: authPayload.username?.length,
+      passwordLength: authPayload.password?.length
+    });
+    
     const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'User-Agent': 'SmartVIN-App/1.0'
       },
-      body: JSON.stringify({
-        secret_key: SECRET_KEY,
-        username: USERNAME,
-        password: PASSWORD
-      })
+      body: JSON.stringify(authPayload)
     });
 
     console.log(`[VIN API] Token response status: ${tokenResponse.status}`);
+    console.log(`[VIN API] Token response headers:`, Object.fromEntries(tokenResponse.headers.entries()));
+
+    // Log the raw response for debugging
+    const responseText = await tokenResponse.text();
+    console.log(`[VIN API] Raw token response:`, responseText);
 
     if (!tokenResponse.ok) {
       let errorMessage = 'Failed to authenticate with VIN service';
-      let errorDetails = '';
+      let errorData = null;
       
       try {
-        const errorData = await tokenResponse.json();
-        errorDetails = JSON.stringify(errorData);
+        errorData = JSON.parse(responseText);
         errorMessage = errorData.message || errorData.error || errorMessage;
       } catch (e) {
-        errorDetails = `Status: ${tokenResponse.status} ${tokenResponse.statusText}`;
+        console.log('[VIN API] Could not parse error response as JSON');
       }
       
-      console.error(`[VIN API] Authentication failed:`, errorDetails);
+      console.error(`[VIN API] Authentication failed:`, {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        response: responseText,
+        errorData
+      });
       
       if (tokenResponse.status === 401 || tokenResponse.status === 403) {
-        errorMessage = 'Invalid credentials. Please check your VIN Data API secret key, username, and password.';
+        errorMessage = 'Invalid credentials. Please verify your VIN Data API secret key, username, and password are correct.';
       } else if (tokenResponse.status === 429) {
         errorMessage = 'Too many authentication requests. Please wait a moment and try again.';
+      } else if (tokenResponse.status === 400) {
+        errorMessage = 'Invalid request format. Please check your credentials format.';
       }
 
       return new Response(JSON.stringify({
         success: false,
         error: `Authentication Error: ${tokenResponse.status}`,
-        message: errorMessage
+        message: errorMessage,
+        debug: {
+          status: tokenResponse.status,
+          response: responseText
+        }
       }), {
         status: tokenResponse.status,
         headers: {
@@ -114,8 +146,29 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       });
     }
 
-    const tokenData = await tokenResponse.json();
-    console.log('[VIN API] Token received successfully');
+    let tokenData;
+    try {
+      tokenData = JSON.parse(responseText);
+    } catch (e) {
+      console.error('[VIN API] Failed to parse token response:', responseText);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid response format',
+        message: 'Received invalid response from authentication service'
+      }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+    
+    console.log('[VIN API] Token response parsed:', {
+      hasToken: !!tokenData.token,
+      expiresIn: tokenData.expires_in,
+      tokenType: typeof tokenData.token
+    });
     
     const authToken = tokenData.token;
 
@@ -124,7 +177,8 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       return new Response(JSON.stringify({
         success: false,
         error: 'Authentication failed',
-        message: 'No authentication token received from VIN service'
+        message: 'No authentication token received from VIN service',
+        debug: tokenData
       }), {
         status: 500,
         headers: {
@@ -138,7 +192,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
     
     // Step 2: Get VIN report using the correct endpoint structure
     // Based on docs: https://api.vindata.com/v1/products/vind/reports/{VIN}?force=false
-    const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin}?force=false`;
+    const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin.toUpperCase()}?force=false`;
     console.log(`[VIN API] Report URL: ${reportUrl}`);
     
     const vinResponse = await fetch(reportUrl, {
@@ -146,24 +200,27 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       headers: {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json'
+        'Accept': 'application/json',
+        'User-Agent': 'SmartVIN-App/1.0'
       }
     });
 
     console.log(`[VIN API] Report response status: ${vinResponse.status}`);
+    console.log(`[VIN API] Report response headers:`, Object.fromEntries(vinResponse.headers.entries()));
+
+    // Log the raw response for debugging
+    const reportResponseText = await vinResponse.text();
+    console.log(`[VIN API] Raw report response:`, reportResponseText);
 
     if (!vinResponse.ok) {
       let errorMessage = `API Error: ${vinResponse.status}`;
-      let errorDetails = '';
+      let errorData = null;
       
       try {
-        const errorData = await vinResponse.json();
-        errorDetails = JSON.stringify(errorData);
+        errorData = JSON.parse(reportResponseText);
         errorMessage = errorData.message || errorData.error || errorMessage;
-        console.error(`[VIN API] Report request failed:`, errorDetails);
       } catch (e) {
-        errorDetails = `Status: ${vinResponse.status} ${vinResponse.statusText}`;
-        console.error(`[VIN API] Report request failed:`, errorDetails);
+        console.log('[VIN API] Could not parse report error response as JSON');
         
         // Provide descriptive error messages based on status code
         if (vinResponse.status >= 500) {
@@ -180,11 +237,22 @@ export async function GET(request: Request, { vin }: { vin: string }) {
           }
         }
       }
+      
+      console.error(`[VIN API] Report request failed:`, {
+        status: vinResponse.status,
+        statusText: vinResponse.statusText,
+        response: reportResponseText,
+        errorData
+      });
 
       return new Response(JSON.stringify({
         success: false,
         error: `API Error: ${vinResponse.status}`,
-        message: errorMessage
+        message: errorMessage,
+        debug: {
+          status: vinResponse.status,
+          response: reportResponseText
+        }
       }), {
         status: vinResponse.status,
         headers: {
@@ -194,8 +262,32 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       });
     }
 
-    const reportData = await vinResponse.json();
-    console.log('[VIN API] Report data received:', Object.keys(reportData));
+    let reportData;
+    try {
+      reportData = JSON.parse(reportResponseText);
+    } catch (e) {
+      console.error('[VIN API] Failed to parse report response:', reportResponseText);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid response format',
+        message: 'Received invalid response from VIN service'
+      }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*',
+        },
+      });
+    }
+    
+    console.log('[VIN API] Report data received:', {
+      hasData: !!reportData,
+      keys: Object.keys(reportData || {}),
+      vin: reportData?.vin,
+      year: reportData?.year,
+      make: reportData?.make,
+      model: reportData?.model
+    });
     
     // The API returns a report with an HTML link and vehicle data
     if (!reportData) {
@@ -247,11 +339,13 @@ export async function GET(request: Request, { vin }: { vin: string }) {
     };
 
     console.log('[VIN API] Successfully processed VIN:', vin);
-    console.log('[VIN API] Vehicle data:', {
+    console.log('[VIN API] Final vehicle data:', {
       year: vehicleData.year,
       make: vehicleData.make,
       model: vehicleData.model,
-      hasHtmlLink: !!vehicleData.htmlLink
+      trim: vehicleData.trim,
+      hasHtmlLink: !!vehicleData.htmlLink,
+      hasBasicData: !!(vehicleData.year && vehicleData.make && vehicleData.model)
     });
 
     return new Response(JSON.stringify({
@@ -278,7 +372,11 @@ export async function GET(request: Request, { vin }: { vin: string }) {
     return new Response(JSON.stringify({
       success: false,
       error: 'Network error',
-      message: errorMessage
+      message: errorMessage,
+      debug: {
+        errorType: error?.constructor?.name,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      }
     }), {
       status: 500,
       headers: {
