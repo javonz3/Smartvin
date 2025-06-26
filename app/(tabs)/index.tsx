@@ -34,6 +34,7 @@ export default function VINLookup() {
     message?: string;
   }>({ isValid: false });
   const [showPaywall, setShowPaywall] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const { 
     subscriptionStatus, 
@@ -46,6 +47,13 @@ export default function VINLookup() {
 
   const conditions = ['Excellent', 'Good', 'Fair', 'Poor'];
   const accidentOptions = ['None', 'Minor', 'Moderate', 'Severe'];
+
+  // Sample VINs for testing
+  const sampleVINs = [
+    '1HGBH41JXMN109186', // Honda Civic
+    '1FTFW1ET5DFC10312', // Ford F-150
+    '5NPE34AF4HH012345'  // Hyundai Elantra
+  ];
 
   const validateVIN = (vinCode: string) => {
     if (!vinCode) {
@@ -77,16 +85,33 @@ export default function VINLookup() {
     const cleanVin = text.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '');
     setVin(cleanVin);
     validateVIN(cleanVin);
+    // Clear any previous error when user starts typing
+    if (errorMessage) {
+      setErrorMessage(null);
+    }
   };
 
   const handleVINScan = (scannedVIN: string) => {
     setVin(scannedVIN.toUpperCase());
     validateVIN(scannedVIN.toUpperCase());
     setShowScanner(false);
+    // Clear any previous error
+    if (errorMessage) {
+      setErrorMessage(null);
+    }
+  };
+
+  const useSampleVIN = (sampleVin: string) => {
+    setVin(sampleVin);
+    validateVIN(sampleVin);
+    if (errorMessage) {
+      setErrorMessage(null);
+    }
   };
 
   const handleLookup = async () => {
     console.log('Starting VIN lookup process...');
+    setErrorMessage(null);
     
     // Check if user can perform VIN lookup
     const permission = await canPerformAction('vin_lookup');
@@ -103,17 +128,17 @@ export default function VINLookup() {
     }
 
     if (!validateVIN(vin)) {
-      Alert.alert('Invalid VIN', vinValidation.message || 'Please enter a valid 17-character VIN');
+      setErrorMessage(vinValidation.message || 'Please enter a valid 17-character VIN');
       return;
     }
 
     if (!mileage || isNaN(Number(mileage)) || Number(mileage) < 0) {
-      Alert.alert('Invalid Mileage', 'Please enter a valid mileage');
+      setErrorMessage('Please enter a valid mileage');
       return;
     }
 
     if (Number(mileage) > 500000) {
-      Alert.alert('High Mileage', 'Mileage seems unusually high. Please verify the entered value.');
+      setErrorMessage('Mileage seems unusually high. Please verify the entered value.');
       return;
     }
 
@@ -129,19 +154,30 @@ export default function VINLookup() {
       
       if (!vinResult.success) {
         console.error('VIN decode failed:', vinResult.error, vinResult.message);
-        Alert.alert(
-          'VIN Decode Error', 
-          vinResult.message || 'Unable to decode VIN. Please verify the VIN is correct.'
-        );
+        
+        // Provide more specific error messages based on the error type
+        let userMessage = vinResult.message || 'Unable to decode VIN. Please verify the VIN is correct.';
+        
+        if (vinResult.error?.includes('404')) {
+          userMessage = `VIN not found in database. This could mean:
+• The VIN may contain a typo - please double-check each character
+• The vehicle may be too old or not in the VIN database
+• Try one of the sample VINs below to test the connection`;
+        } else if (vinResult.error?.includes('401') || vinResult.error?.includes('403')) {
+          userMessage = 'API authentication failed. Please check your API key configuration.';
+        } else if (vinResult.error?.includes('429')) {
+          userMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (vinResult.error?.includes('Network error')) {
+          userMessage = 'Network connection error. Please check your internet connection and try again.';
+        }
+        
+        setErrorMessage(userMessage);
         return;
       }
 
       if (!vinResult.data) {
         console.error('No vehicle data returned');
-        Alert.alert(
-          'No Vehicle Data',
-          'No vehicle information found for this VIN. Please verify the VIN is correct.'
-        );
+        setErrorMessage('No vehicle information found for this VIN. Please verify the VIN is correct or try a sample VIN.');
         return;
       }
 
@@ -166,7 +202,7 @@ export default function VINLookup() {
       });
     } catch (error) {
       console.error('Lookup error:', error);
-      Alert.alert('Error', 'Failed to process VIN lookup. Please check your internet connection and try again.');
+      setErrorMessage('Failed to process VIN lookup. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -211,6 +247,14 @@ export default function VINLookup() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Error Message Display */}
+        {errorMessage && (
+          <View style={styles.errorBanner}>
+            <AlertCircle size={20} color={theme.colors.error} />
+            <Text style={styles.errorBannerText}>{errorMessage}</Text>
+          </View>
+        )}
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Vehicle Information</Text>
           
@@ -250,6 +294,24 @@ export default function VINLookup() {
                 <Text style={styles.successText}>✓ Valid VIN format</Text>
               </View>
             )}
+            
+            {/* Sample VINs for testing */}
+            <View style={styles.sampleVinsContainer}>
+              <Text style={styles.sampleVinsLabel}>Try a sample VIN:</Text>
+              <View style={styles.sampleVinsRow}>
+                {sampleVINs.map((sampleVin, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={styles.sampleVinButton}
+                    onPress={() => useSampleVIN(sampleVin)}
+                  >
+                    <Text style={styles.sampleVinText}>
+                      {sampleVin.substring(0, 8)}...
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -406,6 +468,24 @@ const createStyles = (theme: any) => StyleSheet.create({
     flex: 1,
     padding: 20,
   },
+  errorBanner: {
+    backgroundColor: theme.colors.error + '15',
+    borderColor: theme.colors.error,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  errorBannerText: {
+    flex: 1,
+    fontSize: 14,
+    fontFamily: 'Inter-Regular',
+    color: theme.colors.error,
+    lineHeight: 20,
+  },
   section: {
     backgroundColor: theme.colors.surface,
     borderRadius: 16,
@@ -488,6 +568,36 @@ const createStyles = (theme: any) => StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-Medium',
     color: theme.colors.success,
+  },
+  sampleVinsContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: theme.colors.borderLight,
+  },
+  sampleVinsLabel: {
+    fontSize: 12,
+    fontFamily: 'Inter-Medium',
+    color: theme.colors.textSecondary,
+    marginBottom: 8,
+  },
+  sampleVinsRow: {
+    flexDirection: 'row',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  sampleVinButton: {
+    backgroundColor: theme.colors.primary + '10',
+    borderColor: theme.colors.primary + '30',
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  sampleVinText: {
+    fontSize: 11,
+    fontFamily: 'Inter-Medium',
+    color: theme.colors.primary,
   },
   zipInputContainer: {
     flexDirection: 'row',
