@@ -55,27 +55,38 @@ export class VINApiService {
     }
 
     try {
+      // Using the correct VDP API endpoint format: /api/vin/{vin}
       const response = await fetch(`${this.BASE_URL}/${vin}`, {
         method: 'GET',
         headers: {
-          'Authorization': `Bearer ${this.API_KEY}`,
+          'X-API-Key': this.API_KEY,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }
       });
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
+        let errorMessage = `API Error: ${response.status}`;
+        
+        try {
+          const errorData = await response.json();
+          errorMessage = errorData.message || errorData.error || errorMessage;
+        } catch {
+          // If we can't parse error response, use status text
+          errorMessage = `${response.status}: ${response.statusText}`;
+        }
+
         return {
           success: false,
           error: `API Error: ${response.status}`,
-          message: errorData.message || `Failed to decode VIN: ${response.statusText}`
+          message: errorMessage
         };
       }
 
       const data = await response.json();
       
-      if (!data || !data.vin) {
+      // Check if the response contains vehicle data
+      if (!data || (!data.vin && !data.VIN)) {
         return {
           success: false,
           error: 'Invalid response',
@@ -90,6 +101,15 @@ export class VINApiService {
 
     } catch (error) {
       console.error('VIN API Error:', error);
+      
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        return {
+          success: false,
+          error: 'Network error',
+          message: 'Unable to connect to VIN service. Please check your internet connection.'
+        };
+      }
+
       return {
         success: false,
         error: 'Network error',
@@ -99,32 +119,44 @@ export class VINApiService {
   }
 
   private static transformVDPData(rawData: any): VDPVehicleData {
+    // Handle both uppercase and lowercase field names from API
+    const getField = (field: string) => {
+      return rawData[field] || rawData[field.toLowerCase()] || rawData[field.toUpperCase()] || '';
+    };
+
+    const getNumericField = (field: string, defaultValue: number = 0) => {
+      const value = getField(field);
+      const parsed = parseInt(value) || parseFloat(value);
+      return isNaN(parsed) ? defaultValue : parsed;
+    };
+
     return {
-      vin: rawData.vin || '',
-      year: parseInt(rawData.year) || 0,
-      make: rawData.make || '',
-      model: rawData.model || '',
-      trim: rawData.trim || '',
-      engine: rawData.engine || '',
-      transmission: rawData.transmission || '',
-      drivetrain: rawData.drivetrain || rawData.drive_type || '',
-      bodyStyle: rawData.body_style || rawData.bodyStyle || '',
-      fuelType: rawData.fuel_type || rawData.fuelType || '',
-      doors: parseInt(rawData.doors) || 4,
-      cylinders: parseInt(rawData.cylinders) || 0,
-      displacement: rawData.displacement || '',
-      horsepower: parseInt(rawData.horsepower) || 0,
-      torque: parseInt(rawData.torque) || 0,
-      cityMpg: parseInt(rawData.city_mpg) || 0,
-      highwayMpg: parseInt(rawData.highway_mpg) || 0,
-      combinedMpg: parseInt(rawData.combined_mpg) || 0,
-      msrp: parseInt(rawData.msrp) || 0,
-      category: rawData.category || '',
-      manufacturerCode: rawData.manufacturer_code || '',
-      plantCountry: rawData.plant_country || '',
-      plantCompany: rawData.plant_company || '',
-      plantState: rawData.plant_state || '',
-      plantCity: rawData.plant_city || ''
+      vin: getField('vin') || getField('VIN'),
+      year: getNumericField('year') || getNumericField('model_year'),
+      make: getField('make') || getField('manufacturer'),
+      model: getField('model'),
+      trim: getField('trim') || getField('trim_level'),
+      engine: getField('engine') || getField('engine_description') || 
+              `${getField('engine_displacement')} ${getField('engine_cylinders')}`,
+      transmission: getField('transmission') || getField('transmission_type'),
+      drivetrain: getField('drivetrain') || getField('drive_type') || getField('wheel_base'),
+      bodyStyle: getField('body_style') || getField('bodyStyle') || getField('body_type'),
+      fuelType: getField('fuel_type') || getField('fuelType') || getField('fuel'),
+      doors: getNumericField('doors') || getNumericField('door_count'),
+      cylinders: getNumericField('cylinders') || getNumericField('engine_cylinders'),
+      displacement: getField('displacement') || getField('engine_displacement'),
+      horsepower: getNumericField('horsepower') || getNumericField('engine_hp'),
+      torque: getNumericField('torque') || getNumericField('engine_torque'),
+      cityMpg: getNumericField('city_mpg') || getNumericField('mpg_city'),
+      highwayMpg: getNumericField('highway_mpg') || getNumericField('mpg_highway'),
+      combinedMpg: getNumericField('combined_mpg') || getNumericField('mpg_combined'),
+      msrp: getNumericField('msrp') || getNumericField('base_price'),
+      category: getField('category') || getField('vehicle_type'),
+      manufacturerCode: getField('manufacturer_code') || getField('wmi'),
+      plantCountry: getField('plant_country') || getField('country_of_origin'),
+      plantCompany: getField('plant_company') || getField('manufacturer'),
+      plantState: getField('plant_state') || getField('plant_location'),
+      plantCity: getField('plant_city') || getField('assembly_plant')
     };
   }
 
@@ -165,15 +197,130 @@ export class VINApiService {
     }
 
     const data = result.data;
+    
+    // Build comprehensive specs
+    const engineSpec = data.displacement && data.cylinders 
+      ? `${data.displacement} ${data.cylinders}-Cylinder`
+      : data.engine || 'Engine info not available';
+
+    const fuelEconomySpec = data.cityMpg && data.highwayMpg
+      ? `${data.cityMpg}/${data.highwayMpg} MPG (City/Highway)`
+      : data.combinedMpg 
+        ? `${data.combinedMpg} MPG Combined`
+        : 'Fuel economy not available';
+
+    const performanceSpec = data.horsepower && data.torque
+      ? `${data.horsepower} HP, ${data.torque} lb-ft`
+      : data.horsepower
+        ? `${data.horsepower} HP`
+        : 'Performance data not available';
+
     return {
       success: true,
       specs: {
-        engine: `${data.displacement} ${data.cylinders}-Cylinder ${data.fuelType}`,
-        transmission: data.transmission,
-        drivetrain: data.drivetrain,
-        fuelEconomy: `${data.cityMpg}/${data.highwayMpg} MPG (City/Highway)`,
-        performance: `${data.horsepower} HP, ${data.torque} lb-ft`
+        engine: engineSpec,
+        transmission: data.transmission || 'Transmission info not available',
+        drivetrain: data.drivetrain || 'Drivetrain info not available',
+        fuelEconomy: fuelEconomySpec,
+        performance: performanceSpec
       }
     };
+  }
+
+  // Additional utility method for batch VIN processing (Pro feature)
+  static async decodeBatchVINs(vins: string[]): Promise<{
+    success: boolean;
+    results?: Array<{
+      vin: string;
+      success: boolean;
+      data?: VDPVehicleData;
+      error?: string;
+    }>;
+    error?: string;
+  }> {
+    if (!this.API_KEY) {
+      return {
+        success: false,
+        error: 'API key not configured'
+      };
+    }
+
+    try {
+      const results = await Promise.allSettled(
+        vins.map(async (vin) => {
+          const result = await this.decodeVIN(vin);
+          return {
+            vin,
+            success: result.success,
+            data: result.data,
+            error: result.error
+          };
+        })
+      );
+
+      return {
+        success: true,
+        results: results.map(result => 
+          result.status === 'fulfilled' 
+            ? result.value 
+            : { vin: '', success: false, error: 'Processing failed' }
+        )
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Batch processing failed'
+      };
+    }
+  }
+
+  // Method to validate API key
+  static async validateApiKey(): Promise<{
+    valid: boolean;
+    message: string;
+  }> {
+    if (!this.API_KEY) {
+      return {
+        valid: false,
+        message: 'API key not configured'
+      };
+    }
+
+    try {
+      // Test with a known valid VIN
+      const testVin = '1HGBH41JXMN109186'; // Honda Civic test VIN
+      const response = await fetch(`${this.BASE_URL}/${testVin}`, {
+        method: 'GET',
+        headers: {
+          'X-API-Key': this.API_KEY,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.status === 401 || response.status === 403) {
+        return {
+          valid: false,
+          message: 'Invalid API key or insufficient permissions'
+        };
+      }
+
+      if (response.status === 429) {
+        return {
+          valid: true,
+          message: 'API key valid but rate limit exceeded'
+        };
+      }
+
+      return {
+        valid: response.ok,
+        message: response.ok ? 'API key is valid' : `API returned status ${response.status}`
+      };
+    } catch (error) {
+      return {
+        valid: false,
+        message: 'Unable to validate API key - network error'
+      };
+    }
   }
 }

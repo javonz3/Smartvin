@@ -42,12 +42,15 @@ A comprehensive mobile application for vehicle dealers and professionals to get 
 
 #### VIN Data Project API
 - Sign up at: https://vindataproject.com
-- Get your API key from the dashboard
+- Navigate to your dashboard to get your API key
+- API Documentation: https://vdpvin.docs.apiary.io/
 - Add to `EXPO_PUBLIC_VDP_API_KEY` in `.env`
+
+**Important**: The VIN Data Project API uses `X-API-Key` header for authentication and follows the endpoint pattern `/api/vin/{vin}`.
 
 #### OpenAI API (for AI valuations)
 - Sign up at: https://platform.openai.com
-- Create an API key
+- Create an API key at: https://platform.openai.com/api-keys
 - Add to `EXPO_PUBLIC_OPENAI_API_KEY` in `.env`
 
 ### Running the App
@@ -59,6 +62,38 @@ npm run dev
 # Build for web
 npm run build:web
 ```
+
+## API Integration
+
+### VIN Data Project API
+
+The app uses the VIN Data Project API for vehicle data retrieval:
+
+- **Endpoint**: `https://api.vindataproject.com/api/vin/{vin}`
+- **Authentication**: `X-API-Key` header
+- **Documentation**: https://vdpvin.docs.apiary.io/
+
+#### Example API Usage
+
+```typescript
+const response = await fetch(`https://api.vindataproject.com/api/vin/${vin}`, {
+  headers: {
+    'X-API-Key': 'your_api_key',
+    'Content-Type': 'application/json'
+  }
+});
+```
+
+### Testing API Integration
+
+1. Add your VDP API key to `.env`
+2. Use the built-in API key validation:
+   ```typescript
+   import { VINApiService } from '@/services/vinApi';
+   
+   const validation = await VINApiService.validateApiKey();
+   console.log(validation.message);
+   ```
 
 ## Project Structure
 
@@ -93,7 +128,7 @@ services/
 |----------|-------------|----------|
 | `EXPO_PUBLIC_VDP_API_KEY` | VIN Data Project API key | Yes |
 | `EXPO_PUBLIC_OPENAI_API_KEY` | OpenAI API key for AI valuations | Yes |
-| `EXPO_PUBLIC_API_URL` | Custom API base URL | No |
+| `EXPO_PUBLIC_API_URL` | VDP API base URL | No |
 
 ## Features Overview
 
@@ -102,12 +137,14 @@ services/
 - Barcode scanning (mobile only)
 - Comprehensive vehicle data retrieval
 - Real-time validation
+- Support for all 17-character VINs
 
 ### AI Valuations
 - Wholesale, trade-in, retail, and BHPH values
 - Market trend analysis
 - Confidence scoring
 - Regional pricing factors
+- AI-powered insights
 
 ### Subscription Management
 - Free tier with limited lookups
@@ -136,12 +173,21 @@ services/
 3. Update navigation in `app/(tabs)/_layout.tsx`
 4. Add services in `/services`
 
-### Testing
+### Testing VIN API
 
-- Test VIN scanning on physical devices
-- Verify API integrations with valid keys
-- Test subscription flows
-- Validate cross-platform compatibility
+Test with these sample VINs:
+- `1HGBH41JXMN109186` (Honda Civic)
+- `1FTFW1ET5DFC10312` (Ford F-150)
+- `5NPE34AF4HH012345` (Hyundai Elantra)
+
+### Error Handling
+
+The VIN API service includes comprehensive error handling:
+- Network connectivity issues
+- Invalid API keys
+- Malformed VINs
+- Rate limiting
+- Server errors
 
 ## Deployment
 
@@ -161,6 +207,44 @@ npm install -g @expo/eas-cli
 eas build --platform all
 ```
 
+## Troubleshooting
+
+### Common Issues
+
+1. **"API key not configured"**
+   - Ensure `.env` file exists with `EXPO_PUBLIC_VDP_API_KEY`
+   - Restart the development server after adding environment variables
+
+2. **"Invalid VIN format"**
+   - VINs must be exactly 17 characters
+   - Cannot contain letters I, O, or Q
+   - Must be alphanumeric only
+
+3. **"Network error"**
+   - Check internet connection
+   - Verify API endpoint is accessible
+   - Check for firewall/proxy issues
+
+4. **"API Error: 401"**
+   - Invalid API key
+   - Check your VDP dashboard for the correct key
+
+5. **"API Error: 429"**
+   - Rate limit exceeded
+   - Wait before making more requests
+   - Consider upgrading your VDP plan
+
+### API Key Validation
+
+Use the built-in validation method to test your setup:
+
+```typescript
+import { VINApiService } from '@/services/vinApi';
+
+const result = await VINApiService.validateApiKey();
+console.log(result.message);
+```
+
 ## Contributing
 
 1. Fork the repository
@@ -177,5 +261,6 @@ This project is licensed under the MIT License.
 
 For support and questions:
 - Check the documentation
-- Review API documentation for VIN Data Project
-- Contact support for API-related issues
+- Review VDP API documentation: https://vdpvin.docs.apiary.io/
+- Contact VDP support for API-related issues
+- Check OpenAI documentation for AI service issues
