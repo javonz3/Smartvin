@@ -17,7 +17,7 @@ A comprehensive mobile application for vehicle dealers and professionals to get 
 
 - Node.js 18+ 
 - Expo CLI
-- API keys for VIN Data Project and OpenAI
+- API keys for VIN Data API and OpenAI
 
 ### Installation
 
@@ -34,19 +34,19 @@ A comprehensive mobile application for vehicle dealers and professionals to get 
 
 4. Add your API keys to `.env`:
    ```
-   EXPO_PUBLIC_VDP_API_KEY=your_vindataproject_api_key
+   EXPO_PUBLIC_VDP_API_KEY=your_vindata_api_key
    EXPO_PUBLIC_OPENAI_API_KEY=your_openai_api_key
    ```
 
 ### API Keys Required
 
-#### VIN Data Project API
-- Sign up at: https://vindataproject.com
+#### VIN Data API
+- Sign up at: https://vindata.com
 - Navigate to your dashboard to get your API key
 - API Documentation: https://vdpvin.docs.apiary.io/
 - Add to `EXPO_PUBLIC_VDP_API_KEY` in `.env`
 
-**Important**: The VIN Data Project API uses `Bearer` token authentication and follows the endpoint pattern `/vin/{vin}`.
+**Important**: The VIN Data API uses `X-API-Key` header authentication and follows the endpoint pattern `https://api.vindata.com/v1/vin/{vin}`.
 
 #### OpenAI API (for AI valuations)
 - Sign up at: https://platform.openai.com
@@ -65,20 +65,20 @@ npm run build:web
 
 ## API Integration
 
-### VIN Data Project API
+### VIN Data API
 
-The app uses the VIN Data Project API for vehicle data retrieval:
+The app uses the VIN Data API for vehicle data retrieval:
 
-- **Endpoint**: `https://api.vindataproject.com/vin/{vin}`
-- **Authentication**: `Authorization: Bearer {token}`
+- **Endpoint**: `https://api.vindata.com/v1/vin/{vin}`
+- **Authentication**: `X-API-Key: {your_api_key}`
 - **Documentation**: https://vdpvin.docs.apiary.io/
 
 #### Example API Usage
 
 ```typescript
-const response = await fetch(`https://api.vindataproject.com/vin/${vin}`, {
+const response = await fetch(`https://api.vindata.com/v1/vin/${vin}`, {
   headers: {
-    'Authorization': `Bearer ${API_KEY}`,
+    'X-API-Key': API_KEY,
     'Content-Type': 'application/json'
   }
 });
@@ -86,7 +86,7 @@ const response = await fetch(`https://api.vindataproject.com/vin/${vin}`, {
 
 ### Testing API Integration
 
-1. Add your VDP API key to `.env`
+1. Add your VIN Data API key to `.env`
 2. Use the built-in API key validation:
    ```typescript
    import { VINApiService } from '@/services/vinApi';
@@ -120,7 +120,7 @@ components/
 └── VehicleCard.tsx   # Vehicle listing card
 
 services/
-├── vinApi.ts         # VIN Data Project API
+├── vinApi.ts         # VIN Data API
 ├── valuationApi.ts   # AI valuation service
 └── subscriptionService.ts # Subscription management
 ```
@@ -129,9 +129,9 @@ services/
 
 | Variable | Description | Required |
 |----------|-------------|----------|
-| `EXPO_PUBLIC_VDP_API_KEY` | VIN Data Project API key | Yes |
+| `EXPO_PUBLIC_VDP_API_KEY` | VIN Data API key | Yes |
 | `EXPO_PUBLIC_OPENAI_API_KEY` | OpenAI API key for AI valuations | Yes |
-| `EXPO_PUBLIC_API_URL` | VDP API base URL | No |
+| `EXPO_PUBLIC_API_URL` | VIN Data API base URL | No |
 
 ## Features Overview
 
@@ -230,12 +230,12 @@ eas build --platform all
 
 4. **"API Error: 401"**
    - Invalid API key
-   - Check your VDP dashboard for the correct key
+   - Check your VIN Data dashboard for the correct key
 
 5. **"API Error: 429"**
    - Rate limit exceeded
    - Wait before making more requests
-   - Consider upgrading your VDP plan
+   - Consider upgrading your VIN Data plan
 
 ### API Key Validation
 
@@ -264,6 +264,6 @@ This project is licensed under the MIT License.
 
 For support and questions:
 - Check the documentation
-- Review VDP API documentation: https://vdpvin.docs.apiary.io/
-- Contact VDP support for API-related issues
+- Review VIN Data API documentation: https://vdpvin.docs.apiary.io/
+- Contact VIN Data support for API-related issues
 - Check OpenAI documentation for AI service issues

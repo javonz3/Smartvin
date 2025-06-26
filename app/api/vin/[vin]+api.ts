@@ -45,11 +45,11 @@ export async function GET(request: Request, { vin }: { vin: string }) {
   }
 
   try {
-    // Use the correct VDP API endpoint and authentication method
-    const response = await fetch(`https://api.vindataproject.com/vin/${vin}`, {
+    // Use the correct VIN Data API endpoint from the documentation
+    const response = await fetch(`https://api.vindata.com/v1/vin/${vin}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${API_KEY}`,
+        'X-API-Key': API_KEY,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       }
