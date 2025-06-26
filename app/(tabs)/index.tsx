@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, Scan, Car, MapPin, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Settings } from 'lucide-react-native';
+import { Camera, Scan, Car, MapPin, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { VINScanner } from '@/components/VINScanner';
 import { PaywallModal } from '@/components/PaywallModal';
@@ -34,7 +34,6 @@ export default function VINLookup() {
     message?: string;
   }>({ isValid: false });
   const [showPaywall, setShowPaywall] = useState(false);
-  const [testingCredentials, setTestingCredentials] = useState(false);
 
   const { 
     subscriptionStatus, 
@@ -98,42 +97,7 @@ export default function VINLookup() {
     validateVIN(sampleVin);
   };
 
-  const testCredentials = async () => {
-    setTestingCredentials(true);
-    try {
-      console.log('Testing VIN Data API credentials...');
-      
-      const response = await fetch('/api/test-credentials');
-      const result = await response.json();
-      
-      if (result.success) {
-        Alert.alert(
-          'Credentials Valid ✅',
-          'Your VIN Data API credentials are working correctly!',
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert(
-          'Credentials Invalid ❌',
-          `${result.message}\n\nPlease check your .env file and ensure all three credentials are correct:\n• EXPO_PUBLIC_VDP_API_KEY\n• EXPO_PUBLIC_VDP_USERNAME\n• EXPO_PUBLIC_VDP_PASSWORD`,
-          [{ text: 'OK' }]
-        );
-      }
-    } catch (error) {
-      console.error('Credential test error:', error);
-      Alert.alert(
-        'Test Failed',
-        'Unable to test credentials. Please check your internet connection.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setTestingCredentials(false);
-    }
-  };
-
   const handleLookup = async () => {
-    console.log('Starting VIN lookup process...');
-    
     // Check if user can perform VIN lookup
     const permission = await canPerformAction('vin_lookup');
     if (!permission.allowed) {
@@ -166,16 +130,10 @@ export default function VINLookup() {
     setLoading(true);
 
     try {
-      console.log('Decoding VIN:', vin);
-      
       // First, decode the VIN to get vehicle data
       const vinResult = await VINApiService.decodeVIN(vin);
       
-      console.log('VIN decode result:', vinResult);
-      
       if (!vinResult.success) {
-        console.error('VIN decode failed:', vinResult.error, vinResult.message);
-        
         // Show user-friendly error message
         let userMessage = vinResult.message || 'Unable to decode VIN. Please verify the VIN is correct.';
         
@@ -194,17 +152,12 @@ export default function VINLookup() {
       }
 
       if (!vinResult.data) {
-        console.error('No vehicle data returned');
         Alert.alert('No Data Found', 'No vehicle information was found for this VIN.');
         return;
       }
 
-      console.log('Vehicle data retrieved:', vinResult.data);
-
       // Record usage (this will handle pay-per-request credits and free tier limits)
       await recordUsage('vin_lookup');
-
-      console.log('Navigating to valuation page...');
 
       // Navigate to valuation results with the decoded vehicle data
       router.push({
@@ -247,23 +200,8 @@ export default function VINLookup() {
         colors={['#3b82f6', '#1d4ed8']}
         style={styles.header}
       >
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>SmartVIN</Text>
-          <Text style={styles.headerSubtitle}>AI-Powered Vehicle Valuation</Text>
-        </View>
-        
-        {/* Test Credentials Button */}
-        <TouchableOpacity 
-          style={styles.testButton} 
-          onPress={testCredentials}
-          disabled={testingCredentials}
-        >
-          {testingCredentials ? (
-            <ActivityIndicator size="small" color="#ffffff" />
-          ) : (
-            <Settings size={20} color="#ffffff" />
-          )}
-        </TouchableOpacity>
+        <Text style={styles.headerTitle}>SmartVIN</Text>
+        <Text style={styles.headerSubtitle}>AI-Powered Vehicle Valuation</Text>
       </LinearGradient>
 
       {/* Centered Usage Banner */}
@@ -321,7 +259,7 @@ export default function VINLookup() {
               </View>
             )}
             
-            {/* Enhanced Sample VINs for testing */}
+            {/* Sample VINs for testing */}
             <View style={styles.sampleVinsContainer}>
               <Text style={styles.sampleVinsLabel}>Try a sample VIN:</Text>
               <View style={styles.sampleVinsGrid}>
@@ -472,13 +410,6 @@ const createStyles = (theme: any) => StyleSheet.create({
     paddingVertical: 30,
     borderBottomLeftRadius: 24,
     borderBottomRightRadius: 24,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  headerContent: {
-    flex: 1,
-    alignItems: 'center',
   },
   headerTitle: {
     fontSize: 28,
@@ -492,14 +423,6 @@ const createStyles = (theme: any) => StyleSheet.create({
     color: '#e0e7ff',
     textAlign: 'center',
     marginTop: 4,
-  },
-  testButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   bannerContainer: {
     paddingTop: 16,
