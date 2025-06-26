@@ -200,9 +200,9 @@ export async function GET(request: Request, { vin }: { vin: string }) {
 
     console.log('[VIN API] Step 2: Requesting VIN report...');
     
-    // Step 2: Get VIN report using the correct endpoint structure
-    // Based on docs: https://api.vindata.com/v1/products/vind/reports/{VIN}?force=false
-    const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin.toUpperCase()}?force=false`;
+    // Step 2: Get VIN report using force=true to ensure fresh data
+    // Based on docs: https://api.vindata.com/v1/products/vind/reports/{VIN}?force=true
+    const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin.toUpperCase()}?force=true`;
     console.log(`[VIN API] Report URL: ${reportUrl}`);
     
     const vinResponse = await fetch(reportUrl, {
