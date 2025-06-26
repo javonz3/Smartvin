@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, Scan, Car, MapPin, CircleAlert as AlertCircle, CircleCheck as CheckCircle, RefreshCw, ExternalLink } from 'lucide-react-native';
+import { Camera, Scan, Car, MapPin, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { VINScanner } from '@/components/VINScanner';
 import { PaywallModal } from '@/components/PaywallModal';
@@ -34,8 +34,6 @@ export default function VINLookup() {
     message?: string;
   }>({ isValid: false });
   const [showPaywall, setShowPaywall] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [errorType, setErrorType] = useState<'validation' | 'api' | 'network' | null>(null);
 
   const { 
     subscriptionStatus, 
@@ -86,85 +84,21 @@ export default function VINLookup() {
     const cleanVin = text.toUpperCase().replace(/[^A-HJ-NPR-Z0-9]/g, '');
     setVin(cleanVin);
     validateVIN(cleanVin);
-    // Clear any previous error when user starts typing
-    if (errorMessage) {
-      setErrorMessage(null);
-      setErrorType(null);
-    }
   };
 
   const handleVINScan = (scannedVIN: string) => {
     setVin(scannedVIN.toUpperCase());
     validateVIN(scannedVIN.toUpperCase());
     setShowScanner(false);
-    // Clear any previous error
-    if (errorMessage) {
-      setErrorMessage(null);
-      setErrorType(null);
-    }
   };
 
   const useSampleVIN = (sampleVin: string) => {
     setVin(sampleVin);
     validateVIN(sampleVin);
-    if (errorMessage) {
-      setErrorMessage(null);
-      setErrorType(null);
-    }
-  };
-
-  const clearError = () => {
-    setErrorMessage(null);
-    setErrorType(null);
-  };
-
-  const retryLookup = () => {
-    clearError();
-    handleLookup();
-  };
-
-  const getErrorIcon = () => {
-    switch (errorType) {
-      case 'validation':
-        return <AlertCircle size={20} color={theme.colors.warning} />;
-      case 'api':
-        return <AlertCircle size={20} color={theme.colors.error} />;
-      case 'network':
-        return <RefreshCw size={20} color={theme.colors.error} />;
-      default:
-        return <AlertCircle size={20} color={theme.colors.error} />;
-    }
-  };
-
-  const getErrorStyle = () => {
-    switch (errorType) {
-      case 'validation':
-        return {
-          backgroundColor: theme.colors.warning + '15',
-          borderColor: theme.colors.warning + '30',
-        };
-      case 'api':
-        return {
-          backgroundColor: theme.colors.error + '15',
-          borderColor: theme.colors.error + '30',
-        };
-      case 'network':
-        return {
-          backgroundColor: theme.colors.error + '15',
-          borderColor: theme.colors.error + '30',
-        };
-      default:
-        return {
-          backgroundColor: theme.colors.error + '15',
-          borderColor: theme.colors.error + '30',
-        };
-    }
   };
 
   const handleLookup = async () => {
     console.log('Starting VIN lookup process...');
-    setErrorMessage(null);
-    setErrorType(null);
     
     // Check if user can perform VIN lookup
     const permission = await canPerformAction('vin_lookup');
@@ -181,20 +115,17 @@ export default function VINLookup() {
     }
 
     if (!validateVIN(vin)) {
-      setErrorMessage(vinValidation.message || 'Please enter a valid 17-character VIN');
-      setErrorType('validation');
+      Alert.alert('Invalid VIN', vinValidation.message || 'Please enter a valid 17-character VIN');
       return;
     }
 
     if (!mileage || isNaN(Number(mileage)) || Number(mileage) < 0) {
-      setErrorMessage('Please enter a valid mileage');
-      setErrorType('validation');
+      Alert.alert('Invalid Mileage', 'Please enter a valid mileage');
       return;
     }
 
     if (Number(mileage) > 500000) {
-      setErrorMessage('Mileage seems unusually high. Please verify the entered value.');
-      setErrorType('validation');
+      Alert.alert('High Mileage', 'Mileage seems unusually high. Please verify the entered value.');
       return;
     }
 
@@ -211,102 +142,26 @@ export default function VINLookup() {
       if (!vinResult.success) {
         console.error('VIN decode failed:', vinResult.error, vinResult.message);
         
-        // Provide more specific error messages based on the error type
+        // Show user-friendly error message
         let userMessage = vinResult.message || 'Unable to decode VIN. Please verify the VIN is correct.';
-        let errorCategory: 'validation' | 'api' | 'network' = 'api';
         
         if (vinResult.error?.includes('401') || vinResult.error?.includes('403')) {
-          userMessage = `🔑 **API Authentication Failed**
-
-The VIN Data API credentials are invalid or incorrect. This typically means:
-
-• **Secret Key** is wrong or expired
-• **Username** is incorrect  
-• **Password** is incorrect
-• Account may be suspended or inactive
-
-**Next Steps:**
-1. Check your VIN Data dashboard at vindata.com
-2. Verify all three credentials in your .env file:
-   - EXPO_PUBLIC_VDP_API_KEY (secret key)
-   - EXPO_PUBLIC_VDP_USERNAME (username)
-   - EXPO_PUBLIC_VDP_PASSWORD (password)
-3. Restart the development server after updating credentials
-
-**Test with sample VINs below to verify the fix.**`;
-          errorCategory = 'api';
+          userMessage = 'API authentication failed. Please check your credentials and try again.';
         } else if (vinResult.error?.includes('404')) {
-          userMessage = `🔍 **VIN Not Found**
-
-This VIN was not found in the database. This could mean:
-
-• The VIN may contain a typo - please double-check each character
-• The vehicle may be too old or not in the VIN database
-• The VIN may be from a manufacturer not covered by the service
-
-**Try:**
-• Double-check the VIN for accuracy
-• Use one of the sample VINs below to test the connection
-• Contact VIN Data support if you believe this VIN should be found`;
-          errorCategory = 'validation';
+          userMessage = 'VIN not found in database. Please verify the VIN is correct.';
         } else if (vinResult.error?.includes('429')) {
-          userMessage = `⏱️ **Rate Limit Exceeded**
-
-Too many requests have been made. Please wait a moment before trying again.
-
-**VIN Data API Limits:**
-• Maximum 100 requests per minute
-• Current usage shown in response headers
-
-**Try again in a few minutes.**`;
-          errorCategory = 'api';
-        } else if (vinResult.error?.includes('Network error') || vinResult.error?.includes('fetch')) {
-          userMessage = `🌐 **Network Connection Error**
-
-Unable to connect to the VIN service. This could be due to:
-
-• Internet connection issues
-• VIN Data API service temporarily unavailable
-• Firewall or proxy blocking the request
-
-**Try:**
-• Check your internet connection
-• Wait a moment and try again
-• Use sample VINs to test connectivity`;
-          errorCategory = 'network';
-        } else if (vinResult.error?.includes('500')) {
-          userMessage = `🔧 **Service Temporarily Unavailable**
-
-The VIN Data service is experiencing technical difficulties.
-
-**This is usually temporary. Please:**
-• Wait a few minutes and try again
-• Use sample VINs to test when service is restored
-• Check VIN Data status page for updates`;
-          errorCategory = 'api';
+          userMessage = 'Too many requests. Please wait a moment and try again.';
+        } else if (vinResult.error?.includes('Network error')) {
+          userMessage = 'Network connection error. Please check your internet connection and try again.';
         }
         
-        setErrorMessage(userMessage);
-        setErrorType(errorCategory);
+        Alert.alert('VIN Lookup Failed', userMessage);
         return;
       }
 
       if (!vinResult.data) {
         console.error('No vehicle data returned');
-        setErrorMessage(`🚗 **No Vehicle Data Found**
-
-The VIN was processed but no vehicle information was returned.
-
-**This could mean:**
-• The VIN is valid but not in the database
-• The vehicle data is incomplete or unavailable
-• There was an issue processing the response
-
-**Try:**
-• Verify the VIN is correct
-• Use a sample VIN to test the service
-• Contact support if this persists`);
-        setErrorType('api');
+        Alert.alert('No Data Found', 'No vehicle information was found for this VIN.');
         return;
       }
 
@@ -331,19 +186,7 @@ The VIN was processed but no vehicle information was returned.
       });
     } catch (error) {
       console.error('Lookup error:', error);
-      setErrorMessage(`💥 **Unexpected Error**
-
-An unexpected error occurred while processing your request.
-
-**Error Details:**
-${error instanceof Error ? error.message : 'Unknown error occurred'}
-
-**Try:**
-• Check your internet connection
-• Wait a moment and try again
-• Use a sample VIN to test the service
-• Contact support if this continues`);
-      setErrorType('network');
+      Alert.alert('Error', 'Failed to process VIN lookup. Please check your internet connection and try again.');
     } finally {
       setLoading(false);
     }
@@ -388,48 +231,6 @@ ${error instanceof Error ? error.message : 'Unknown error occurred'}
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Enhanced Error Message Display */}
-        {errorMessage && (
-          <View style={[styles.errorBanner, getErrorStyle()]}>
-            <View style={styles.errorHeader}>
-              {getErrorIcon()}
-              <Text style={styles.errorTitle}>
-                {errorType === 'validation' ? 'Input Error' :
-                 errorType === 'api' ? 'API Error' :
-                 errorType === 'network' ? 'Connection Error' : 'Error'}
-              </Text>
-              <TouchableOpacity style={styles.closeErrorButton} onPress={clearError}>
-                <AlertCircle size={16} color={theme.colors.textTertiary} />
-              </TouchableOpacity>
-            </View>
-            <Text style={styles.errorBannerText}>{errorMessage}</Text>
-            {(errorType === 'network' || errorType === 'api') && (
-              <View style={styles.errorActions}>
-                <TouchableOpacity style={styles.retryButton} onPress={retryLookup}>
-                  <RefreshCw size={16} color={theme.colors.primary} />
-                  <Text style={styles.retryButtonText}>Try Again</Text>
-                </TouchableOpacity>
-                {errorType === 'api' && (
-                  <TouchableOpacity 
-                    style={styles.helpButton}
-                    onPress={() => {
-                      // In a real app, this could open documentation or support
-                      Alert.alert(
-                        'Need Help?',
-                        'Check the README.md file for detailed setup instructions, or contact support for assistance with API configuration.',
-                        [{ text: 'OK' }]
-                      );
-                    }}
-                  >
-                    <ExternalLink size={16} color={theme.colors.textSecondary} />
-                    <Text style={styles.helpButtonText}>Get Help</Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            )}
-          </View>
-        )}
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Vehicle Information</Text>
           
@@ -644,71 +445,6 @@ const createStyles = (theme: any) => StyleSheet.create({
   content: {
     flex: 1,
     padding: 20,
-  },
-  errorBanner: {
-    borderWidth: 1,
-    borderRadius: 16,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  errorHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 8,
-  },
-  errorTitle: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: 'Inter-SemiBold',
-    color: theme.colors.error,
-  },
-  closeErrorButton: {
-    padding: 4,
-  },
-  errorBannerText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Regular',
-    color: theme.colors.error,
-    lineHeight: 20,
-    marginBottom: 16,
-  },
-  errorActions: {
-    flexDirection: 'row',
-    gap: 12,
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.primary + '20',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  retryButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    color: theme.colors.primary,
-  },
-  helpButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: theme.colors.borderLight,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 6,
-  },
-  helpButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: theme.colors.textSecondary,
   },
   section: {
     backgroundColor: theme.colors.surface,
