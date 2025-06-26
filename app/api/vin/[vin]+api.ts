@@ -22,8 +22,6 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept, User-Agent',
       },
     });
   }
@@ -40,8 +38,6 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept, User-Agent',
       },
     });
   }
@@ -58,13 +54,11 @@ export async function GET(request: Request, { vin }: { vin: string }) {
     
     console.log('[VIN API] Authentication payload prepared');
     
-    // Step 1: Get authentication token with CLEAN headers
+    // Step 1: Get authentication token with minimal headers
     const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'SmartVIN-App/1.0'
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(authPayload)
     });
@@ -87,8 +81,6 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Accept, User-Agent',
         },
       });
     }
@@ -107,25 +99,23 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Accept, User-Agent',
         },
       });
     }
 
     console.log('[VIN API] Step 2: Requesting VIN report...');
     
-    // Step 2: Get VIN report with ONLY ONE Authorization header
+    // Step 2: Get VIN report with ONLY the Authorization header we need
     const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin.toUpperCase()}?force=true`;
+    
+    // Create a clean headers object with only what we need
+    const cleanHeaders = new Headers();
+    cleanHeaders.set('Authorization', `Bearer ${authToken}`);
+    cleanHeaders.set('Content-Type', 'application/json');
     
     const vinResponse = await fetch(reportUrl, {
       method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'SmartVIN-App/1.0'
-      }
+      headers: cleanHeaders
     });
 
     console.log(`[VIN API] Report response status: ${vinResponse.status}`);
@@ -146,8 +136,6 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         headers: {
           'Content-Type': 'application/json',
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-          'Access-Control-Allow-Headers': 'Content-Type, Accept, User-Agent',
         },
       });
     }
@@ -198,8 +186,6 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept, User-Agent',
       },
     });
 
@@ -215,8 +201,6 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'Content-Type, Accept, User-Agent',
       },
     });
   }
@@ -228,9 +212,8 @@ export async function OPTIONS(request: Request) {
     status: 200,
     headers: {
       'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Accept, User-Agent, Authorization',
-      'Access-Control-Max-Age': '86400',
+      'Access-Control-Allow-Methods': 'GET, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
     },
   });
 }
