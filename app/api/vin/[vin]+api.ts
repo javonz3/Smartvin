@@ -68,31 +68,28 @@ export async function GET(request: Request, { vin }: { vin: string }) {
     const authPayload = {
       secret_key: SECRET_KEY.trim(),
       username: USERNAME.trim(),
-      password: PASSWORD.trim() // This should be "Smooth1one.23"
+      password: PASSWORD.trim()
     };
     
     console.log('[VIN API] Authentication payload:', {
       secret_key: authPayload.secret_key,
       username: authPayload.username,
-      password: authPayload.password // Full password for debugging
+      password: authPayload.password
     });
     
-    // Step 1: Get authentication token with proper headers
-    const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'SmartVIN-App/1.0',
-        'Cache-Control': 'no-cache'
-      },
-      body: JSON.stringify(authPayload)
-    });
-
-    console.log(`[VIN API] Token request headers sent:`, {
+    // Step 1: Get authentication token - CLEAN headers, no extra auth
+    const authHeaders = {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'User-Agent': 'SmartVIN-App/1.0'
+    };
+    
+    console.log('[VIN API] Auth request headers:', authHeaders);
+    
+    const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
+      method: 'POST',
+      headers: authHeaders,
+      body: JSON.stringify(authPayload)
     });
     
     console.log(`[VIN API] Token response status: ${tokenResponse.status}`);
@@ -191,26 +188,27 @@ export async function GET(request: Request, { vin }: { vin: string }) {
 
     console.log('[VIN API] Step 2: Requesting VIN report...');
     
-    // Step 2: Get VIN report using force=true with proper Authorization header
+    // Step 2: Get VIN report - ONLY ONE Authorization header
     const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin.toUpperCase()}?force=true`;
     console.log(`[VIN API] Report URL: ${reportUrl}`);
     
-    const vinResponse = await fetch(reportUrl, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${authToken}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'User-Agent': 'SmartVIN-App/1.0',
-        'Cache-Control': 'no-cache'
-      }
-    });
-
-    console.log(`[VIN API] Report request headers sent:`, {
-      'Authorization': `Bearer ${authToken.substring(0, 20)}...`,
+    const reportHeaders = {
+      'Authorization': `Bearer ${authToken}`,
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'User-Agent': 'SmartVIN-App/1.0'
+    };
+    
+    console.log('[VIN API] Report request headers:', {
+      'Authorization': `Bearer ${authToken.substring(0, 20)}...`,
+      'Content-Type': reportHeaders['Content-Type'],
+      'Accept': reportHeaders['Accept'],
+      'User-Agent': reportHeaders['User-Agent']
+    });
+    
+    const vinResponse = await fetch(reportUrl, {
+      method: 'GET',
+      headers: reportHeaders
     });
 
     console.log(`[VIN API] Report response status: ${vinResponse.status}`);
