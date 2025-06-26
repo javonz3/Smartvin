@@ -61,7 +61,22 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         const errorData = await response.json();
         errorMessage = errorData.message || errorData.error || errorMessage;
       } catch {
-        errorMessage = `${response.status}: ${response.statusText}`;
+        // Provide descriptive error messages based on status code ranges
+        if (response.status >= 500) {
+          errorMessage = 'The VIN service is temporarily unavailable. Please try again later.';
+        } else if (response.status >= 400 && response.status < 500) {
+          if (response.status === 404) {
+            errorMessage = 'No vehicle data found for this VIN number.';
+          } else if (response.status === 401 || response.status === 403) {
+            errorMessage = 'Authentication failed with the VIN service.';
+          } else if (response.status === 429) {
+            errorMessage = 'Too many requests. Please wait a moment and try again.';
+          } else {
+            errorMessage = 'Invalid request. Please check the VIN number and try again.';
+          }
+        } else {
+          errorMessage = response.statusText || 'An unexpected error occurred with the VIN service.';
+        }
       }
 
       return new Response(JSON.stringify({
