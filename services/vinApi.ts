@@ -24,6 +24,10 @@ export interface VDPVehicleData {
   plantCompany: string;
   plantState: string;
   plantCity: string;
+  // Additional VIN Data API specific fields
+  htmlLink?: string;
+  reportId?: string;
+  reportDate?: string;
 }
 
 export interface VDPApiResponse {
@@ -34,9 +38,8 @@ export interface VDPApiResponse {
 }
 
 export class VINApiService {
-  private static readonly BASE_URL = '/api/vin'; // Use local API route instead of external URL
-  private static readonly API_KEY = process.env.EXPO_PUBLIC_VDP_API_KEY;
-
+  private static readonly BASE_URL = '/api/vin'; // Use local API route
+  
   static async decodeVIN(vin: string): Promise<VDPApiResponse> {
     if (!this.isValidVIN(vin)) {
       return {
@@ -47,6 +50,8 @@ export class VINApiService {
     }
 
     try {
+      console.log(`Making VIN API request for: ${vin}`);
+      
       // Use the local API route which will proxy to the external service
       const response = await fetch(`${this.BASE_URL}/${vin}`, {
         method: 'GET',
@@ -56,12 +61,15 @@ export class VINApiService {
         }
       });
 
+      console.log(`VIN API response status: ${response.status}`);
+
       if (!response.ok) {
         let errorMessage = `API Error: ${response.status}`;
         
         try {
           const errorData = await response.json();
           errorMessage = errorData.message || errorData.error || errorMessage;
+          console.error('VIN API Error Response:', errorData);
         } catch {
           // If we can't parse error response, use status text
           errorMessage = `${response.status}: ${response.statusText}`;
@@ -75,6 +83,7 @@ export class VINApiService {
       }
 
       const result = await response.json();
+      console.log('VIN API Success Response:', result);
       
       // Check if the response contains vehicle data
       if (!result.success) {
@@ -91,7 +100,7 @@ export class VINApiService {
       };
 
     } catch (error) {
-      console.error('VIN API Error:', error);
+      console.error('VIN API Network Error:', error);
       
       if (error instanceof TypeError && error.message.includes('fetch')) {
         return {
@@ -110,6 +119,8 @@ export class VINApiService {
   }
 
   private static transformVDPData(rawData: any): VDPVehicleData {
+    console.log('Transforming VDP data:', rawData);
+    
     // Transform VDP API response according to their documented structure
     return {
       vin: rawData.vin || '',
@@ -136,7 +147,11 @@ export class VINApiService {
       plantCountry: rawData.plant_country || '',
       plantCompany: rawData.plant_company || '',
       plantState: rawData.plant_state || '',
-      plantCity: rawData.plant_city || ''
+      plantCity: rawData.plant_city || '',
+      // VIN Data API specific fields
+      htmlLink: rawData.htmlLink,
+      reportId: rawData.reportId,
+      reportDate: rawData.reportDate
     };
   }
 
@@ -253,6 +268,8 @@ export class VINApiService {
     message: string;
   }> {
     try {
+      console.log('Validating API key...');
+      
       // Test with a known valid VIN
       const testVin = '1HGBH41JXMN109186'; // Honda Civic test VIN
       const response = await fetch(`${this.BASE_URL}/${testVin}`, {
@@ -262,6 +279,8 @@ export class VINApiService {
           'Accept': 'application/json'
         }
       });
+
+      console.log(`API validation response status: ${response.status}`);
 
       if (response.status === 401 || response.status === 403) {
         return {
@@ -277,15 +296,47 @@ export class VINApiService {
         };
       }
 
+      if (response.ok) {
+        const result = await response.json();
+        return {
+          valid: result.success,
+          message: result.success ? 'API key is valid and working' : result.message || 'API key validation failed'
+        };
+      }
+
       return {
-        valid: response.ok,
-        message: response.ok ? 'API key is valid' : `API returned status ${response.status}`
+        valid: false,
+        message: `API returned status ${response.status}`
       };
     } catch (error) {
+      console.error('API validation error:', error);
       return {
         valid: false,
         message: 'Unable to validate API key - network error'
       };
     }
+  }
+
+  // Method to get detailed vehicle report (Pro feature)
+  static async getDetailedReport(vin: string): Promise<{
+    success: boolean;
+    reportUrl?: string;
+    reportId?: string;
+    error?: string;
+  }> {
+    const result = await this.decodeVIN(vin);
+    
+    if (!result.success || !result.data) {
+      return {
+        success: false,
+        error: result.error || 'Failed to get vehicle report'
+      };
+    }
+
+    return {
+      success: true,
+      reportUrl: result.data.htmlLink,
+      reportId: result.data.reportId
+    };
   }
 }

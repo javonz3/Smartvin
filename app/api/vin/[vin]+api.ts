@@ -47,7 +47,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
   }
 
   try {
-    // Step 1: Get authentication token with all required credentials
+    // Step 1: Get authentication token
     const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
       method: 'POST',
       headers: {
@@ -97,8 +97,9 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       });
     }
 
-    // Step 2: Use the token to get VIN data
-    const vinResponse = await fetch(`https://api.vindata.com/v1/vin/${vin}`, {
+    // Step 2: Get VIN report using the correct endpoint structure
+    // Based on the API docs: /products/vind/reports/{VIN}?force=false
+    const vinResponse = await fetch(`https://api.vindata.com/v1/products/vind/reports/${vin}?force=false`, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${authToken}`,
@@ -144,14 +145,14 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       });
     }
 
-    const data = await vinResponse.json();
+    const reportData = await vinResponse.json();
     
-    // Check if the response contains valid vehicle data
-    if (!data || !data.vin) {
+    // The API returns a report with an HTML link - we need to extract the actual vehicle data
+    if (!reportData || !reportData.html_link) {
       return new Response(JSON.stringify({
         success: false,
         error: 'Invalid response',
-        message: 'No vehicle data found for this VIN'
+        message: 'No vehicle report generated for this VIN'
       }), {
         status: 404,
         headers: {
@@ -160,9 +161,43 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       });
     }
 
+    // For now, we'll extract basic info from the report response
+    // In a production app, you might want to parse the HTML report or use additional API endpoints
+    const vehicleData = {
+      vin: vin,
+      year: reportData.year || 0,
+      make: reportData.make || '',
+      model: reportData.model || '',
+      trim: reportData.trim || '',
+      engine: reportData.engine || '',
+      transmission: reportData.transmission || '',
+      drivetrain: reportData.drivetrain || '',
+      bodyStyle: reportData.body_style || '',
+      fuelType: reportData.fuel_type || '',
+      doors: parseInt(reportData.doors) || 4,
+      cylinders: parseInt(reportData.cylinders) || 0,
+      displacement: reportData.displacement || '',
+      horsepower: parseInt(reportData.horsepower) || 0,
+      torque: parseInt(reportData.torque) || 0,
+      cityMpg: parseInt(reportData.city_mpg) || 0,
+      highwayMpg: parseInt(reportData.highway_mpg) || 0,
+      combinedMpg: parseInt(reportData.combined_mpg) || 0,
+      msrp: parseInt(reportData.msrp) || 0,
+      category: reportData.category || '',
+      manufacturerCode: reportData.manufacturer_code || '',
+      plantCountry: reportData.plant_country || '',
+      plantCompany: reportData.plant_company || '',
+      plantState: reportData.plant_state || '',
+      plantCity: reportData.plant_city || '',
+      // Additional fields from the report
+      htmlLink: reportData.html_link,
+      reportId: reportData.id,
+      reportDate: reportData.created_at
+    };
+
     return new Response(JSON.stringify({
       success: true,
-      data: data
+      data: vehicleData
     }), {
       status: 200,
       headers: {

@@ -43,23 +43,26 @@ A comprehensive mobile application for vehicle dealers and professionals to get 
 ### API Keys Required
 
 #### VIN Data API
-- Sign up at: https://vindata.com
-- Navigate to your dashboard to get your credentials:
-  - **Secret Key** (`secret_key`)
-  - **Username** (`username`) 
-  - **Password** (`password`)
-- API Documentation: https://vdpvin.docs.apiary.io/
-- Add all three credentials to your `.env` file
+- **Website**: https://vindata.com
+- **Documentation**: https://vdpvin.docs.apiary.io/
+- **Required Credentials**:
+  - **Secret Key** (`secret_key`) - Found in your VIN Data dashboard
+  - **Username** (`username`) - Your VIN Data account username
+  - **Password** (`password`) - Your VIN Data account password
 
-**Important**: The VIN Data API requires three authentication parameters:
-- `secret_key`: Your API secret key from the dashboard
-- `username`: Your VIN Data username
-- `password`: Your VIN Data password
-
-**Authentication Flow**:
-1. POST to `/token` endpoint with `secret_key`, `username`, and `password` to get a Bearer token
-2. Use the Bearer token in the `Authorization` header for VIN requests
+**Authentication Process**:
+1. POST to `/token` endpoint with all three credentials to get a Bearer token
+2. Use the Bearer token for VIN report requests
 3. Tokens expire after 1 hour and need to be refreshed
+
+**API Endpoints Used**:
+- **Authentication**: `POST https://api.vindata.com/v1/token`
+- **VIN Reports**: `GET https://api.vindata.com/v1/products/vind/reports/{VIN}?force=false`
+
+**Rate Limiting**:
+- Maximum 100 requests per minute
+- HTTP 429 response when limit exceeded
+- Reports are cached for 90 days
 
 #### OpenAI API (for AI valuations)
 - Sign up at: https://platform.openai.com
@@ -76,56 +79,85 @@ npm run dev
 npm run build:web
 ```
 
-## API Integration
+## API Integration Details
 
-### VIN Data API
+### VIN Data API Implementation
 
-The app uses the VIN Data API for vehicle data retrieval:
+The app uses a two-step authentication process with the VIN Data API:
 
-- **Base URL**: `https://api.vindata.com/v1`
-- **Authentication**: Bearer token (obtained via `/token` endpoint)
-- **Documentation**: https://vdpvin.docs.apiary.io/
+#### Step 1: Authentication
+```typescript
+POST https://api.vindata.com/v1/token
+Content-Type: application/json
 
-#### Authentication Process
+{
+  "secret_key": "your_secret_key",
+  "username": "your_username", 
+  "password": "your_password"
+}
+```
 
-1. **Get Token**: POST to `/token` with your credentials
-   ```typescript
-   const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
-     method: 'POST',
-     headers: { 'Content-Type': 'application/json' },
-     body: JSON.stringify({ 
-       secret_key: YOUR_SECRET_KEY,
-       username: YOUR_USERNAME,
-       password: YOUR_PASSWORD
-     })
-   });
-   ```
+**Response**:
+```json
+{
+  "token": "bearer_token_here",
+  "expires_in": 3600
+}
+```
 
-2. **Use Token**: Include Bearer token in VIN requests
-   ```typescript
-   const response = await fetch(`https://api.vindata.com/v1/vin/${vin}`, {
-     headers: {
-       'Authorization': `Bearer ${token}`,
-       'Content-Type': 'application/json'
-     }
-   });
-   ```
+#### Step 2: VIN Report Request
+```typescript
+GET https://api.vindata.com/v1/products/vind/reports/{VIN}?force=false
+Authorization: Bearer {token}
+Content-Type: application/json
+```
 
-#### Rate Limiting
-- Maximum 100 requests per minute
-- HTTP 429 response when limit exceeded
-- `X-Calls-Count` header shows current usage
+**Parameters**:
+- `{VIN}`: 17-character VIN number
+- `force=false`: Returns cached report if available (within 90 days)
+- `force=true`: Generates new report (costs additional credits)
+
+**Response Structure**:
+```json
+{
+  "id": "report_id",
+  "vin": "1HGBH41JXMN109186",
+  "html_link": "https://reports.vindata.com/...",
+  "created_at": "2024-01-15T10:30:00Z",
+  "year": 2021,
+  "make": "Honda",
+  "model": "Civic",
+  "trim": "LX",
+  // ... additional vehicle data
+}
+```
+
+### Error Handling
+
+The API service includes comprehensive error handling for:
+
+- **401/403**: Invalid credentials
+- **404**: VIN not found
+- **429**: Rate limit exceeded (100 requests/minute)
+- **500+**: Server errors
+- **Network errors**: Connection issues
 
 ### Testing API Integration
 
-1. Add your VIN Data credentials to `.env`:
-   ```
-   EXPO_PUBLIC_VDP_API_KEY=your_secret_key
+1. **Environment Setup**:
+   ```bash
+   # Add to .env file
+   EXPO_PUBLIC_VDP_API_KEY=b1b094ca-65c5-460c-a396-6f8fd2d0cd1b
    EXPO_PUBLIC_VDP_USERNAME=your_username
    EXPO_PUBLIC_VDP_PASSWORD=your_password
    ```
 
-2. Use the built-in API key validation:
+2. **Test VINs**:
+   - `1HGBH41JXMN109186` (Honda Civic)
+   - `1FTFW1ET5DFC10312` (Ford F-150)
+   - `5NPE34AF4HH012345` (Hyundai Elantra)
+
+3. **API Validation**:
    ```typescript
    import { VINApiService } from '@/services/vinApi';
    
@@ -158,54 +190,119 @@ components/
 └── VehicleCard.tsx   # Vehicle listing card
 
 services/
-├── vinApi.ts         # VIN Data API
+├── vinApi.ts         # VIN Data API client
 ├── valuationApi.ts   # AI valuation service
 └── subscriptionService.ts # Subscription management
 ```
 
 ## Environment Variables
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `EXPO_PUBLIC_VDP_API_KEY` | VIN Data secret key | Yes |
-| `EXPO_PUBLIC_VDP_USERNAME` | VIN Data username | Yes |
-| `EXPO_PUBLIC_VDP_PASSWORD` | VIN Data password | Yes |
-| `EXPO_PUBLIC_OPENAI_API_KEY` | OpenAI API key for AI valuations | Yes |
-| `EXPO_PUBLIC_API_URL` | VIN Data API base URL | No |
+| Variable | Description | Required | Example |
+|----------|-------------|----------|---------|
+| `EXPO_PUBLIC_VDP_API_KEY` | VIN Data secret key | Yes | `b1b094ca-65c5-460c-a396-6f8fd2d0cd1b` |
+| `EXPO_PUBLIC_VDP_USERNAME` | VIN Data username | Yes | `your_username` |
+| `EXPO_PUBLIC_VDP_PASSWORD` | VIN Data password | Yes | `your_password` |
+| `EXPO_PUBLIC_OPENAI_API_KEY` | OpenAI API key | Yes | `sk-...` |
 
 ## Features Overview
 
 ### VIN Lookup
-- Manual VIN entry with validation
+- Manual VIN entry with real-time validation
 - Barcode scanning (mobile only)
 - Comprehensive vehicle data retrieval
-- Real-time validation
 - Support for all 17-character VINs
+- Sample VINs for testing
 
 ### AI Valuations
 - Wholesale, trade-in, retail, and BHPH values
-- Market trend analysis
-- Confidence scoring
+- Market trend analysis with confidence scoring
 - Regional pricing factors
-- AI-powered insights
+- AI-powered insights and recommendations
 
 ### Subscription Management
-- Free tier with limited lookups
-- Pay-per-request option
-- Pro subscription with unlimited access
+- Free tier: 3 VIN lookups per month
+- Pay-per-request: $9.99 per lookup
+- Pro subscription: Unlimited access with advanced features
 - Usage tracking and analytics
 
 ### Professional Features
-- PDF report generation
-- Bulk VIN processing
-- Advanced analytics
-- Market insights
+- PDF report generation (Pro)
+- Bulk VIN processing (Pro)
+- Advanced analytics dashboard
+- Market insights and trends
 
 ## Platform Support
 
 - ✅ iOS (via Expo Go or development build)
-- ✅ Android (via Expo Go or development build)
-- ✅ Web (full functionality)
+- ✅ Android (via Expo Go or development build)  
+- ✅ Web (full functionality with server-side API proxy)
+
+## API Rate Limits & Costs
+
+### VIN Data API
+- **Rate Limit**: 100 requests per minute
+- **Report Caching**: 90 days (use `force=false` to avoid extra costs)
+- **Token Expiry**: 1 hour (automatically refreshed)
+
+### Best Practices
+- Use `force=false` parameter to leverage cached reports
+- Implement proper error handling for rate limits
+- Cache tokens to minimize authentication requests
+- Monitor usage to stay within rate limits
+
+## Troubleshooting
+
+### Common Issues
+
+1. **"API credentials not configured"**
+   - Ensure all three credentials are in `.env`:
+     - `EXPO_PUBLIC_VDP_API_KEY` (secret key)
+     - `EXPO_PUBLIC_VDP_USERNAME` (username)
+     - `EXPO_PUBLIC_VDP_PASSWORD` (password)
+   - Restart development server after adding variables
+
+2. **"Authentication failed" (401/403)**
+   - Verify credentials in VIN Data dashboard
+   - Check username/password are correct
+   - Ensure secret key hasn't expired
+
+3. **"Too many requests" (429)**
+   - Rate limit: 100 requests/minute
+   - Wait before making more requests
+   - Consider upgrading VIN Data plan
+
+4. **"No vehicle data found" (404)**
+   - VIN not in database
+   - Verify VIN is correct (17 characters, no I/O/Q)
+   - Try with known test VINs
+
+5. **Token expiration**
+   - Tokens expire after 1 hour
+   - App automatically requests new tokens
+   - Check credentials if repeated failures
+
+### VIN Data Dashboard
+
+Access your VIN Data dashboard at: https://vindata.com/dashboard
+
+**Required Information**:
+- **Secret Key**: Found in API section
+- **Username**: Your account username
+- **Password**: Your account password
+
+### API Testing
+
+Test your integration with the built-in validation:
+
+```typescript
+// Test API connectivity
+const result = await VINApiService.validateApiKey();
+console.log(result.message);
+
+// Test VIN decoding
+const vinResult = await VINApiService.decodeVIN('1HGBH41JXMN109186');
+console.log(vinResult);
+```
 
 ## Development
 
@@ -216,22 +313,13 @@ services/
 3. Update navigation in `app/(tabs)/_layout.tsx`
 4. Add services in `/services`
 
-### Testing VIN API
+### API Proxy Pattern
 
-Test with these sample VINs:
-- `1HGBH41JXMN109186` (Honda Civic)
-- `1FTFW1ET5DFC10312` (Ford F-150)
-- `5NPE34AF4HH012345` (Hyundai Elantra)
-
-### Error Handling
-
-The VIN API service includes comprehensive error handling:
-- Network connectivity issues
-- Invalid credentials
-- Malformed VINs
-- Rate limiting (100 requests/minute)
-- Token expiration (1 hour)
-- Server errors
+The app uses a server-side API proxy (`app/api/vin/[vin]+api.ts`) to:
+- Secure API credentials on the server
+- Handle authentication token management
+- Provide consistent error handling
+- Enable CORS for web clients
 
 ## Deployment
 
@@ -241,8 +329,6 @@ npm run build:web
 ```
 
 ### Mobile Deployment
-Use Expo Application Services (EAS) for building and distributing mobile apps:
-
 ```bash
 # Install EAS CLI
 npm install -g @expo/eas-cli
@@ -251,74 +337,12 @@ npm install -g @expo/eas-cli
 eas build --platform all
 ```
 
-## Troubleshooting
-
-### Common Issues
-
-1. **"API credentials not configured"**
-   - Ensure `.env` file exists with all three VIN Data credentials:
-     - `EXPO_PUBLIC_VDP_API_KEY` (secret key)
-     - `EXPO_PUBLIC_VDP_USERNAME` (username)
-     - `EXPO_PUBLIC_VDP_PASSWORD` (password)
-   - Restart the development server after adding environment variables
-
-2. **"Authentication failed"**
-   - Verify all three credentials are correct
-   - Check your VIN Data dashboard for the correct values
-   - Ensure credentials haven't expired or been changed
-
-3. **"Invalid VIN format"**
-   - VINs must be exactly 17 characters
-   - Cannot contain letters I, O, or Q
-   - Must be alphanumeric only
-
-4. **"Network error"**
-   - Check internet connection
-   - Verify API endpoint is accessible
-   - Check for firewall/proxy issues
-
-5. **"API Error: 401"**
-   - Invalid credentials (secret key, username, or password)
-   - Token has expired (tokens last 1 hour)
-   - Check your VIN Data dashboard for the correct credentials
-
-6. **"API Error: 429"**
-   - Rate limit exceeded (100 requests/minute)
-   - Wait before making more requests
-   - Consider upgrading your VIN Data plan
-
-7. **"Token expired"**
-   - Tokens automatically expire after 1 hour
-   - The app will automatically request a new token
-   - If issues persist, check your credentials
-
-### VIN Data Credentials
-
-**Important**: VIN Data requires three authentication parameters:
-1. **Secret Key**: Found in your VIN Data dashboard
-2. **Username**: Your VIN Data account username
-3. **Password**: Your VIN Data account password
-
-All three are required for the authentication token request.
-
-### API Key Validation
-
-Use the built-in validation method to test your setup:
-
-```typescript
-import { VINApiService } from '@/services/vinApi';
-
-const result = await VINApiService.validateApiKey();
-console.log(result.message);
-```
-
 ## Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+3. Test with real VIN Data API credentials
+4. Submit a pull request
 
 ## License
 
@@ -326,8 +350,7 @@ This project is licensed under the MIT License.
 
 ## Support
 
-For support and questions:
-- Check the documentation
-- Review VIN Data API documentation: https://vdpvin.docs.apiary.io/
-- Contact VIN Data support for API-related issues
-- Check OpenAI documentation for AI service issues
+For support:
+- VIN Data API: https://vdpvin.docs.apiary.io/
+- OpenAI API: https://platform.openai.com/docs
+- Expo: https://docs.expo.dev/
