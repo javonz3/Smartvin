@@ -64,41 +64,41 @@ export async function GET(request: Request, { vin }: { vin: string }) {
   try {
     console.log('[VIN API] Step 1: Authenticating with VIN Data API...');
     
-    // IMPORTANT: Properly handle special characters in credentials
-    // The password contains special characters like # which need to be preserved
+    // Prepare authentication payload with exact credentials
     const authPayload = {
       secret_key: SECRET_KEY.trim(),
       username: USERNAME.trim(),
-      password: PASSWORD.trim() // Keep the full password including special characters
+      password: PASSWORD.trim() // This should be "Smooth1one.23"
     };
     
-    console.log('[VIN API] Authentication payload structure:', {
-      hasSecretKey: !!authPayload.secret_key,
-      hasUsername: !!authPayload.username,
-      hasPassword: !!authPayload.password,
-      secretKeyLength: authPayload.secret_key?.length,
-      usernameLength: authPayload.username?.length,
-      passwordLength: authPayload.password?.length,
-      passwordPreview: authPayload.password ? `${authPayload.password.substring(0, 8)}...` : 'MISSING'
+    console.log('[VIN API] Authentication payload:', {
+      secret_key: authPayload.secret_key,
+      username: authPayload.username,
+      password: authPayload.password // Full password for debugging
     });
     
-    // Step 1: Get authentication token
-    // Based on docs: https://vdpvin.docs.apiary.io/#reference/0/authentication/get-token
+    // Step 1: Get authentication token with proper headers
     const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'User-Agent': 'SmartVIN-App/1.0'
+        'User-Agent': 'SmartVIN-App/1.0',
+        'Cache-Control': 'no-cache'
       },
-      // Use JSON.stringify to properly encode special characters
       body: JSON.stringify(authPayload)
     });
 
+    console.log(`[VIN API] Token request headers sent:`, {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'SmartVIN-App/1.0'
+    });
+    
     console.log(`[VIN API] Token response status: ${tokenResponse.status}`);
     console.log(`[VIN API] Token response headers:`, Object.fromEntries(tokenResponse.headers.entries()));
 
-    // Log the raw response for debugging
+    // Get response text for debugging
     const responseText = await tokenResponse.text();
     console.log(`[VIN API] Raw token response:`, responseText);
 
@@ -118,16 +118,11 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         statusText: tokenResponse.statusText,
         response: responseText,
         errorData,
-        credentialsUsed: {
-          secretKey: SECRET_KEY ? `${SECRET_KEY.substring(0, 8)}...` : 'MISSING',
-          username: USERNAME || 'MISSING',
-          passwordLength: PASSWORD?.length || 0,
-          passwordHasSpecialChars: PASSWORD ? /[^a-zA-Z0-9]/.test(PASSWORD) : false
-        }
+        requestPayload: authPayload
       });
       
       if (tokenResponse.status === 401 || tokenResponse.status === 403) {
-        errorMessage = 'Invalid credentials. Please verify your VIN Data API secret key, username, and password are correct. Note: Special characters in passwords must be exact.';
+        errorMessage = 'Invalid credentials. Please verify your VIN Data API credentials are correct.';
       } else if (tokenResponse.status === 429) {
         errorMessage = 'Too many authentication requests. Please wait a moment and try again.';
       } else if (tokenResponse.status === 400) {
@@ -141,11 +136,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         debug: {
           status: tokenResponse.status,
           response: responseText,
-          credentialsCheck: {
-            hasAllCredentials: !!(SECRET_KEY && USERNAME && PASSWORD),
-            passwordLength: PASSWORD?.length || 0,
-            passwordHasSpecialChars: PASSWORD ? /[^a-zA-Z0-9]/.test(PASSWORD) : false
-          }
+          requestPayload: authPayload
         }
       }), {
         status: tokenResponse.status,
@@ -177,7 +168,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
     console.log('[VIN API] Token response parsed:', {
       hasToken: !!tokenData.token,
       expiresIn: tokenData.expires_in,
-      tokenType: typeof tokenData.token
+      tokenPreview: tokenData.token ? `${tokenData.token.substring(0, 20)}...` : 'NONE'
     });
     
     const authToken = tokenData.token;
@@ -200,8 +191,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
 
     console.log('[VIN API] Step 2: Requesting VIN report...');
     
-    // Step 2: Get VIN report using force=true to ensure fresh data
-    // Based on docs: https://api.vindata.com/v1/products/vind/reports/{VIN}?force=true
+    // Step 2: Get VIN report using force=true with proper Authorization header
     const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin.toUpperCase()}?force=true`;
     console.log(`[VIN API] Report URL: ${reportUrl}`);
     
@@ -211,14 +201,22 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         'Authorization': `Bearer ${authToken}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'User-Agent': 'SmartVIN-App/1.0'
+        'User-Agent': 'SmartVIN-App/1.0',
+        'Cache-Control': 'no-cache'
       }
+    });
+
+    console.log(`[VIN API] Report request headers sent:`, {
+      'Authorization': `Bearer ${authToken.substring(0, 20)}...`,
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'User-Agent': 'SmartVIN-App/1.0'
     });
 
     console.log(`[VIN API] Report response status: ${vinResponse.status}`);
     console.log(`[VIN API] Report response headers:`, Object.fromEntries(vinResponse.headers.entries()));
 
-    // Log the raw response for debugging
+    // Get response text for debugging
     const reportResponseText = await vinResponse.text();
     console.log(`[VIN API] Raw report response:`, reportResponseText);
 
@@ -239,7 +237,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
           if (vinResponse.status === 404) {
             errorMessage = 'No vehicle data found for this VIN number.';
           } else if (vinResponse.status === 401 || vinResponse.status === 403) {
-            errorMessage = 'Authentication failed with the VIN service. Please check your API credentials.';
+            errorMessage = 'Authentication failed with the VIN service. Token may have expired.';
           } else if (vinResponse.status === 429) {
             errorMessage = 'Too many requests. Please wait a moment and try again.';
           } else {
@@ -252,7 +250,8 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         status: vinResponse.status,
         statusText: vinResponse.statusText,
         response: reportResponseText,
-        errorData
+        errorData,
+        authTokenUsed: authToken ? `${authToken.substring(0, 20)}...` : 'NONE'
       });
 
       return new Response(JSON.stringify({
@@ -261,7 +260,8 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         message: errorMessage,
         debug: {
           status: vinResponse.status,
-          response: reportResponseText
+          response: reportResponseText,
+          authTokenPresent: !!authToken
         }
       }), {
         status: vinResponse.status,
