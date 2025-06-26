@@ -46,7 +46,7 @@ A comprehensive mobile application for vehicle dealers and professionals to get 
 - API Documentation: https://vdpvin.docs.apiary.io/
 - Add to `EXPO_PUBLIC_VDP_API_KEY` in `.env`
 
-**Important**: The VIN Data Project API uses `X-API-Key` header for authentication and follows the endpoint pattern `/api/vin/{vin}`.
+**Important**: The VIN Data Project API uses `Bearer` token authentication and follows the endpoint pattern `/vin/{vin}`.
 
 #### OpenAI API (for AI valuations)
 - Sign up at: https://platform.openai.com
@@ -69,16 +69,16 @@ npm run build:web
 
 The app uses the VIN Data Project API for vehicle data retrieval:
 
-- **Endpoint**: `https://api.vindataproject.com/api/vin/{vin}`
-- **Authentication**: `X-API-Key` header
+- **Endpoint**: `https://api.vindataproject.com/vin/{vin}`
+- **Authentication**: `Authorization: Bearer {token}`
 - **Documentation**: https://vdpvin.docs.apiary.io/
 
 #### Example API Usage
 
 ```typescript
-const response = await fetch(`https://api.vindataproject.com/api/vin/${vin}`, {
+const response = await fetch(`https://api.vindataproject.com/vin/${vin}`, {
   headers: {
-    'X-API-Key': 'your_api_key',
+    'Authorization': `Bearer ${API_KEY}`,
     'Content-Type': 'application/json'
   }
 });
@@ -108,7 +108,10 @@ app/
 ├── valuation.tsx     # Valuation results
 ├── marketplace.tsx   # Vehicle marketplace
 ├── compare.tsx       # Vehicle comparison
-└── alerts.tsx        # Price alerts
+├── alerts.tsx        # Price alerts
+└── api/
+    └── vin/
+        └── [vin]+api.ts # VIN API proxy route
 
 components/
 ├── VINScanner.tsx    # Barcode scanner

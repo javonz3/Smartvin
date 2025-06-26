@@ -45,10 +45,11 @@ export async function GET(request: Request, { vin }: { vin: string }) {
   }
 
   try {
-    const response = await fetch(`https://api.vindataproject.com/api/vin/${vin}`, {
+    // Use the correct VDP API endpoint and authentication method
+    const response = await fetch(`https://api.vindataproject.com/vin/${vin}`, {
       method: 'GET',
       headers: {
-        'X-API-Key': API_KEY,
+        'Authorization': `Bearer ${API_KEY}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       }
@@ -68,7 +69,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
           if (response.status === 404) {
             errorMessage = 'No vehicle data found for this VIN number.';
           } else if (response.status === 401 || response.status === 403) {
-            errorMessage = 'Authentication failed with the VIN service.';
+            errorMessage = 'Authentication failed with the VIN service. Please check your API key.';
           } else if (response.status === 429) {
             errorMessage = 'Too many requests. Please wait a moment and try again.';
           } else {
@@ -93,7 +94,8 @@ export async function GET(request: Request, { vin }: { vin: string }) {
 
     const data = await response.json();
     
-    if (!data || (!data.vin && !data.VIN)) {
+    // Check if the response contains valid vehicle data
+    if (!data || !data.vin) {
       return new Response(JSON.stringify({
         success: false,
         error: 'Invalid response',

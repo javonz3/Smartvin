@@ -110,44 +110,33 @@ export class VINApiService {
   }
 
   private static transformVDPData(rawData: any): VDPVehicleData {
-    // Handle both uppercase and lowercase field names from API
-    const getField = (field: string) => {
-      return rawData[field] || rawData[field.toLowerCase()] || rawData[field.toUpperCase()] || '';
-    };
-
-    const getNumericField = (field: string, defaultValue: number = 0) => {
-      const value = getField(field);
-      const parsed = parseInt(value) || parseFloat(value);
-      return isNaN(parsed) ? defaultValue : parsed;
-    };
-
+    // Transform VDP API response according to their documented structure
     return {
-      vin: getField('vin') || getField('VIN'),
-      year: getNumericField('year') || getNumericField('model_year'),
-      make: getField('make') || getField('manufacturer'),
-      model: getField('model'),
-      trim: getField('trim') || getField('trim_level'),
-      engine: getField('engine') || getField('engine_description') || 
-              `${getField('engine_displacement')} ${getField('engine_cylinders')}`,
-      transmission: getField('transmission') || getField('transmission_type'),
-      drivetrain: getField('drivetrain') || getField('drive_type') || getField('wheel_base'),
-      bodyStyle: getField('body_style') || getField('bodyStyle') || getField('body_type'),
-      fuelType: getField('fuel_type') || getField('fuelType') || getField('fuel'),
-      doors: getNumericField('doors') || getNumericField('door_count'),
-      cylinders: getNumericField('cylinders') || getNumericField('engine_cylinders'),
-      displacement: getField('displacement') || getField('engine_displacement'),
-      horsepower: getNumericField('horsepower') || getNumericField('engine_hp'),
-      torque: getNumericField('torque') || getNumericField('engine_torque'),
-      cityMpg: getNumericField('city_mpg') || getNumericField('mpg_city'),
-      highwayMpg: getNumericField('highway_mpg') || getNumericField('mpg_highway'),
-      combinedMpg: getNumericField('combined_mpg') || getNumericField('mpg_combined'),
-      msrp: getNumericField('msrp') || getNumericField('base_price'),
-      category: getField('category') || getField('vehicle_type'),
-      manufacturerCode: getField('manufacturer_code') || getField('wmi'),
-      plantCountry: getField('plant_country') || getField('country_of_origin'),
-      plantCompany: getField('plant_company') || getField('manufacturer'),
-      plantState: getField('plant_state') || getField('plant_location'),
-      plantCity: getField('plant_city') || getField('assembly_plant')
+      vin: rawData.vin || '',
+      year: parseInt(rawData.year) || 0,
+      make: rawData.make || '',
+      model: rawData.model || '',
+      trim: rawData.trim || '',
+      engine: rawData.engine || '',
+      transmission: rawData.transmission || '',
+      drivetrain: rawData.drivetrain || rawData.drive_type || '',
+      bodyStyle: rawData.body_style || rawData.bodyStyle || '',
+      fuelType: rawData.fuel_type || rawData.fuelType || '',
+      doors: parseInt(rawData.doors) || 4,
+      cylinders: parseInt(rawData.cylinders) || 0,
+      displacement: rawData.displacement || '',
+      horsepower: parseInt(rawData.horsepower) || 0,
+      torque: parseInt(rawData.torque) || 0,
+      cityMpg: parseInt(rawData.city_mpg) || 0,
+      highwayMpg: parseInt(rawData.highway_mpg) || 0,
+      combinedMpg: parseInt(rawData.combined_mpg) || 0,
+      msrp: parseInt(rawData.msrp) || 0,
+      category: rawData.category || '',
+      manufacturerCode: rawData.manufacturer_code || '',
+      plantCountry: rawData.plant_country || '',
+      plantCompany: rawData.plant_company || '',
+      plantState: rawData.plant_state || '',
+      plantCity: rawData.plant_city || ''
     };
   }
 
