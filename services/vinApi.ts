@@ -34,20 +34,10 @@ export interface VDPApiResponse {
 }
 
 export class VINApiService {
-  private static readonly BASE_URL = process.env.EXPO_PUBLIC_API_URL 
-    ? `${process.env.EXPO_PUBLIC_API_URL}/api/vin`
-    : 'https://api.vindataproject.com/api/vin';
+  private static readonly BASE_URL = '/api/vin'; // Use local API route instead of external URL
   private static readonly API_KEY = process.env.EXPO_PUBLIC_VDP_API_KEY;
 
   static async decodeVIN(vin: string): Promise<VDPApiResponse> {
-    if (!this.API_KEY) {
-      return {
-        success: false,
-        error: 'API key not configured',
-        message: 'VDP API key is missing from environment variables'
-      };
-    }
-
     if (!this.isValidVIN(vin)) {
       return {
         success: false,
@@ -57,11 +47,10 @@ export class VINApiService {
     }
 
     try {
-      // Using the correct VDP API endpoint format: /api/vin/{vin}
+      // Use the local API route which will proxy to the external service
       const response = await fetch(`${this.BASE_URL}/${vin}`, {
         method: 'GET',
         headers: {
-          'X-API-Key': this.API_KEY,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }
@@ -85,20 +74,20 @@ export class VINApiService {
         };
       }
 
-      const data = await response.json();
+      const result = await response.json();
       
       // Check if the response contains vehicle data
-      if (!data || (!data.vin && !data.VIN)) {
+      if (!result.success) {
         return {
           success: false,
-          error: 'Invalid response',
-          message: 'No vehicle data found for this VIN'
+          error: result.error || 'API Error',
+          message: result.message || 'Failed to decode VIN'
         };
       }
 
       return {
         success: true,
-        data: this.transformVDPData(data)
+        data: this.transformVDPData(result.data)
       };
 
     } catch (error) {
@@ -240,13 +229,6 @@ export class VINApiService {
     }>;
     error?: string;
   }> {
-    if (!this.API_KEY) {
-      return {
-        success: false,
-        error: 'API key not configured'
-      };
-    }
-
     try {
       const results = await Promise.allSettled(
         vins.map(async (vin) => {
@@ -281,20 +263,12 @@ export class VINApiService {
     valid: boolean;
     message: string;
   }> {
-    if (!this.API_KEY) {
-      return {
-        valid: false,
-        message: 'API key not configured'
-      };
-    }
-
     try {
       // Test with a known valid VIN
       const testVin = '1HGBH41JXMN109186'; // Honda Civic test VIN
       const response = await fetch(`${this.BASE_URL}/${testVin}`, {
         method: 'GET',
         headers: {
-          'X-API-Key': this.API_KEY,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         }
