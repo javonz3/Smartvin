@@ -175,18 +175,29 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         }
       }
       
-      // Add specific status-based guidance
+      // Add specific status-based guidance with enhanced product group help
       switch (vinResponse.status) {
         case 400:
-          if (errorText.includes('No suitable product group found')) {
-            errorMessage += ` - Please check your product group setting (${PRODUCT_GROUP}). Common values are 'vind' for VIN decoding. Verify in your VIN Data dashboard.`;
+          if (errorText.includes('No suitable product group found') || errorText.includes('product group')) {
+            errorMessage = `PRODUCT GROUP ERROR: The product group '${PRODUCT_GROUP}' is not valid for your VIN Data account.
+
+SOLUTION STEPS:
+1. Log in to your VIN Data dashboard: https://vindata.com/dashboard
+2. Navigate to the "Products" or "API Access" section
+3. Find your available product groups (might be: 'vin', 'vehicle', 'decode', 'basic', 'premium', etc.)
+4. Update your .env file with the EXACT product group name from your dashboard
+5. Restart the development server
+
+If you're unsure about your product group, contact VIN Data support or try these common alternatives: 'vin', 'vehicle', 'decode', 'basic', 'premium'`;
+          } else {
+            errorMessage += ` - Please check your product group setting (${PRODUCT_GROUP}). Log in to your VIN Data dashboard to verify the correct product group name.`;
           }
           break;
         case 401:
           errorMessage += ' - Authentication token may have expired. Please try again';
           break;
         case 403:
-          errorMessage += ' - Access forbidden. Your account may not have access to this VIN or product group';
+          errorMessage += ` - Access forbidden. Your account may not have access to the '${PRODUCT_GROUP}' product group or this specific VIN. Check your VIN Data dashboard for available product groups and account permissions.`;
           break;
         case 404:
           errorMessage += ' - VIN not found in database. Please verify the VIN is correct';
