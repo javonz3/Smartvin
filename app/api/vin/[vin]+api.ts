@@ -162,7 +162,7 @@ export async function GET(request: Request, { vin }: { vin: string }) {
     console.log('[VIN API] Step 2: Requesting VIN report...');
     
     // Step 2: Get VIN report with proper Bearer token format
-    const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin.toUpperCase()}?force=false`;
+    const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin.toUpperCase()}?force=true`;
     
     console.log(`[VIN API] Making request to: ${reportUrl}`);
     console.log(`[VIN API] Using Bearer token: ${authToken.substring(0, 20)}...`);
