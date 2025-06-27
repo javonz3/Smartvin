@@ -142,28 +142,14 @@ The API service includes comprehensive error handling for:
 - **500+**: Server errors
 - **Network errors**: Connection issues
 
-### Testing API Integration
+### API Validation
 
-1. **Environment Setup**:
-   ```bash
-   # Add to .env file
-   EXPO_PUBLIC_VDP_API_KEY=b1b094ca-65c5-460c-a396-6f8fd2d0cd1b
-   EXPO_PUBLIC_VDP_USERNAME=your_username
-   EXPO_PUBLIC_VDP_PASSWORD=your_password
-   ```
+```typescript
+import { VINApiService } from '@/services/vinApi';
 
-2. **Test VINs**:
-   - `1HGBH41JXMN109186` (Honda Civic)
-   - `1FTFW1ET5DFC10312` (Ford F-150)
-   - `5NPE34AF4HH012345` (Hyundai Elantra)
-
-3. **API Validation**:
-   ```typescript
-   import { VINApiService } from '@/services/vinApi';
-   
-   const validation = await VINApiService.validateApiKey();
-   console.log(validation.message);
-   ```
+const validation = await VINApiService.validateApiKey();
+console.log(validation.message);
+```
 
 ## Project Structure
 
@@ -199,7 +185,7 @@ services/
 
 | Variable | Description | Required | Example |
 |----------|-------------|----------|---------|
-| `EXPO_PUBLIC_VDP_API_KEY` | VIN Data secret key | Yes | `b1b094ca-65c5-460c-a396-6f8fd2d0cd1b` |
+| `EXPO_PUBLIC_VDP_API_KEY` | VIN Data secret key | Yes | `your_secret_key` |
 | `EXPO_PUBLIC_VDP_USERNAME` | VIN Data username | Yes | `your_username` |
 | `EXPO_PUBLIC_VDP_PASSWORD` | VIN Data password | Yes | `your_password` |
 | `EXPO_PUBLIC_OPENAI_API_KEY` | OpenAI API key | Yes | `sk-...` |
@@ -211,7 +197,6 @@ services/
 - Barcode scanning (mobile only)
 - Comprehensive vehicle data retrieval
 - Support for all 17-character VINs
-- Sample VINs for testing
 
 ### AI Valuations
 - Wholesale, trade-in, retail, and BHPH values
@@ -274,7 +259,6 @@ services/
 4. **"No vehicle data found" (404)**
    - VIN not in database
    - Verify VIN is correct (17 characters, no I/O/Q)
-   - Try with known test VINs
 
 5. **Token expiration**
    - Tokens expire after 1 hour

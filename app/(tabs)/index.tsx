@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Camera, Scan, Car, MapPin, CircleAlert as AlertCircle, CircleCheck as CheckCircle, Settings } from 'lucide-react-native';
+import { Camera, Scan, Car, MapPin, CircleAlert as AlertCircle, CircleCheck as CheckCircle } from 'lucide-react-native';
 import { router } from 'expo-router';
 import { VINScanner } from '@/components/VINScanner';
 import { PaywallModal } from '@/components/PaywallModal';
@@ -34,7 +34,6 @@ export default function VINLookup() {
     message?: string;
   }>({ isValid: false });
   const [showPaywall, setShowPaywall] = useState(false);
-  const [testingCredentials, setTestingCredentials] = useState(false);
 
   const { 
     subscriptionStatus, 
@@ -47,13 +46,6 @@ export default function VINLookup() {
 
   const conditions = ['Excellent', 'Good', 'Fair', 'Poor'];
   const accidentOptions = ['None', 'Minor', 'Moderate', 'Severe'];
-
-  // Sample VINs for testing
-  const sampleVINs = [
-    { vin: '1HGBH41JXMN109186', label: 'Honda Civic' },
-    { vin: '1FTFW1ET5DFC10312', label: 'Ford F-150' },
-    { vin: '5NPE34AF4HH012345', label: 'Hyundai Elantra' }
-  ];
 
   const validateVIN = (vinCode: string) => {
     if (!vinCode) {
@@ -91,52 +83,6 @@ export default function VINLookup() {
     setVin(scannedVIN.toUpperCase());
     validateVIN(scannedVIN.toUpperCase());
     setShowScanner(false);
-  };
-
-  const useSampleVIN = (sampleVin: string) => {
-    setVin(sampleVin);
-    validateVIN(sampleVin);
-  };
-
-  const testCredentials = async () => {
-    setTestingCredentials(true);
-    try {
-      console.log('[VIN Lookup] Testing API credentials...');
-      
-      const response = await fetch('/api/test-credentials', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
-
-      const result = await response.json();
-      console.log('[VIN Lookup] Credentials test result:', result);
-
-      if (result.success) {
-        Alert.alert(
-          'Credentials Valid ✅',
-          'Your VIN Data API credentials are working correctly!',
-          [{ text: 'OK' }]
-        );
-      } else {
-        Alert.alert(
-          'Credentials Invalid ❌',
-          `Authentication failed: ${result.message}\n\nPlease check your .env file and ensure:\n• EXPO_PUBLIC_VDP_API_KEY is correct\n• EXPO_PUBLIC_VDP_USERNAME is correct\n• EXPO_PUBLIC_VDP_PASSWORD includes all special characters (like #)`,
-          [{ text: 'OK' }]
-        );
-      }
-    } catch (error) {
-      console.error('[VIN Lookup] Credentials test error:', error);
-      Alert.alert(
-        'Test Failed',
-        'Unable to test credentials. Please check your internet connection.',
-        [{ text: 'OK' }]
-      );
-    } finally {
-      setTestingCredentials(false);
-    }
   };
 
   const handleLookup = async () => {
@@ -260,24 +206,6 @@ export default function VINLookup() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* API Test Section */}
-        <View style={styles.testSection}>
-          <TouchableOpacity 
-            style={styles.testButton} 
-            onPress={testCredentials}
-            disabled={testingCredentials}
-          >
-            {testingCredentials ? (
-              <ActivityIndicator size="small" color="#ffffff" />
-            ) : (
-              <Settings size={16} color="#ffffff" />
-            )}
-            <Text style={styles.testButtonText}>
-              {testingCredentials ? 'Testing...' : 'Test API Credentials'}
-            </Text>
-          </TouchableOpacity>
-        </View>
-
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Vehicle Information</Text>
           
@@ -318,25 +246,6 @@ export default function VINLookup() {
                 <Text style={styles.successText}>Valid VIN format</Text>
               </View>
             )}
-            
-            {/* Sample VINs for testing */}
-            <View style={styles.sampleVinsContainer}>
-              <Text style={styles.sampleVinsLabel}>Try a sample VIN:</Text>
-              <View style={styles.sampleVinsGrid}>
-                {sampleVINs.map((sample, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={styles.sampleVinButton}
-                    onPress={() => useSampleVIN(sample.vin)}
-                  >
-                    <Text style={styles.sampleVinLabel}>{sample.label}</Text>
-                    <Text style={styles.sampleVinText}>
-                      {sample.vin.substring(0, 8)}...
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
           </View>
 
           <View style={styles.inputGroup}>
@@ -489,30 +398,6 @@ const createStyles = (theme: any) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  testSection: {
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  testButton: {
-    backgroundColor: '#7c3aed',
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    gap: 8,
-    shadowColor: '#7c3aed',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  testButtonText: {
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    color: '#ffffff',
-  },
   content: {
     flex: 1,
     padding: 20,
@@ -602,42 +487,6 @@ const createStyles = (theme: any) => StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-Medium',
     color: theme.colors.success,
-  },
-  sampleVinsContainer: {
-    marginTop: 16,
-    paddingTop: 16,
-    borderTopWidth: 1,
-    borderTopColor: theme.colors.borderLight,
-  },
-  sampleVinsLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter-Medium',
-    color: theme.colors.textSecondary,
-    marginBottom: 12,
-  },
-  sampleVinsGrid: {
-    gap: 8,
-  },
-  sampleVinButton: {
-    backgroundColor: theme.colors.primary + '10',
-    borderColor: theme.colors.primary + '30',
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 12,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sampleVinLabel: {
-    fontSize: 14,
-    fontFamily: 'Inter-SemiBold',
-    color: theme.colors.primary,
-  },
-  sampleVinText: {
-    fontSize: 12,
-    fontFamily: 'Inter-Medium',
-    color: theme.colors.primary,
-    opacity: 0.7,
   },
   zipInputContainer: {
     flexDirection: 'row',
