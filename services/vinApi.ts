@@ -45,7 +45,7 @@ export class VINApiService {
       return {
         success: false,
         error: 'Invalid VIN format',
-        message: 'VIN must be 17 characters long and contain only valid characters'
+        message: 'VIN must be 17 characters long and contain only valid characters (no I, O, or Q)'
       };
     }
 
@@ -83,7 +83,7 @@ export class VINApiService {
       }
 
       const result = await response.json();
-      console.log('[VINApiService] VIN API Success Response:', result);
+      console.log('[VINApiService] VIN API Success Response received');
       
       // Check if the response contains vehicle data
       if (!result.success) {
@@ -96,7 +96,7 @@ export class VINApiService {
 
       return {
         success: true,
-        data: this.transformVDPData(result.data)
+        data: result.data
       };
 
     } catch (error) {
@@ -116,43 +116,6 @@ export class VINApiService {
         message: error instanceof Error ? error.message : 'Failed to connect to VIN service'
       };
     }
-  }
-
-  private static transformVDPData(rawData: any): VDPVehicleData {
-    console.log('[VINApiService] Transforming VDP data:', rawData);
-    
-    // Transform VDP API response according to their documented structure
-    return {
-      vin: rawData.vin || '',
-      year: parseInt(rawData.year) || 0,
-      make: rawData.make || '',
-      model: rawData.model || '',
-      trim: rawData.trim || '',
-      engine: rawData.engine || '',
-      transmission: rawData.transmission || '',
-      drivetrain: rawData.drivetrain || rawData.drive_type || '',
-      bodyStyle: rawData.body_style || rawData.bodyStyle || '',
-      fuelType: rawData.fuel_type || rawData.fuelType || '',
-      doors: parseInt(rawData.doors) || 4,
-      cylinders: parseInt(rawData.cylinders) || 0,
-      displacement: rawData.displacement || '',
-      horsepower: parseInt(rawData.horsepower) || 0,
-      torque: parseInt(rawData.torque) || 0,
-      cityMpg: parseInt(rawData.city_mpg) || 0,
-      highwayMpg: parseInt(rawData.highway_mpg) || 0,
-      combinedMpg: parseInt(rawData.combined_mpg) || 0,
-      msrp: parseInt(rawData.msrp) || 0,
-      category: rawData.category || '',
-      manufacturerCode: rawData.manufacturer_code || '',
-      plantCountry: rawData.plant_country || '',
-      plantCompany: rawData.plant_company || '',
-      plantState: rawData.plant_state || '',
-      plantCity: rawData.plant_city || '',
-      // VIN Data API specific fields
-      htmlLink: rawData.htmlLink,
-      reportId: rawData.reportId,
-      reportDate: rawData.reportDate
-    };
   }
 
   private static isValidVIN(vin: string): boolean {
@@ -262,36 +225,34 @@ export class VINApiService {
     }
   }
 
-  // Method to validate API key
+  // Method to validate API credentials
   static async validateApiKey(): Promise<{
     valid: boolean;
     message: string;
   }> {
     try {
-      console.log('[VINApiService] Validating API key...');
+      console.log('[VINApiService] Validating API credentials...');
       
-      // Use the test credentials endpoint
-      const response = await fetch('/api/test-credentials', {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        }
-      });
+      // Test with a simple VIN decode request
+      const testVin = 'WBANE53577CZ89123'; // BMW test VIN
+      const result = await this.decodeVIN(testVin);
 
-      console.log(`[VINApiService] API validation response status: ${response.status}`);
-
-      const result = await response.json();
-
-      return {
-        valid: result.success,
-        message: result.message || 'API validation completed'
-      };
+      if (result.success) {
+        return {
+          valid: true,
+          message: '✅ API credentials are valid and working correctly!'
+        };
+      } else {
+        return {
+          valid: false,
+          message: `❌ API validation failed: ${result.message}`
+        };
+      }
     } catch (error) {
       console.error('[VINApiService] API validation error:', error);
       return {
         valid: false,
-        message: 'Unable to validate API key - network error'
+        message: '❌ Unable to validate API credentials - network error'
       };
     }
   }
