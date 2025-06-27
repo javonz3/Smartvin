@@ -8,7 +8,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Database, Wifi, WifiOff, Settings, CheckCircle, AlertCircle, Info } from 'lucide-react-native';
+import { Database, Wifi, WifiOff, Settings, CircleCheck as CheckCircle, CircleAlert as AlertCircle, Info } from 'lucide-react-native';
 import { VinApiConfig } from '@/services/vinApiConfig';
 import { MockVinDataService } from '@/services/mockVinData';
 
