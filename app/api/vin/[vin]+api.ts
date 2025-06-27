@@ -4,19 +4,21 @@ export async function GET(request: Request, { vin }: { vin: string }) {
   const SECRET_KEY = process.env.EXPO_PUBLIC_VDP_API_KEY;
   const USERNAME = process.env.EXPO_PUBLIC_VDP_USERNAME;
   const PASSWORD = process.env.EXPO_PUBLIC_VDP_PASSWORD;
+  const PRODUCT_GROUP = process.env.EXPO_PUBLIC_VDP_PRODUCT_GROUP;
   
   // Check if all required credentials are present
-  if (!SECRET_KEY || !USERNAME || !PASSWORD) {
+  if (!SECRET_KEY || !USERNAME || !PASSWORD || !PRODUCT_GROUP) {
     console.error('[VIN API] Missing credentials:', {
       hasSecretKey: !!SECRET_KEY,
       hasUsername: !!USERNAME,
-      hasPassword: !!PASSWORD
+      hasPassword: !!PASSWORD,
+      hasProductGroup: !!PRODUCT_GROUP
     });
     
     return new Response(JSON.stringify({
       success: false,
       error: 'API credentials not configured',
-      message: 'VDP API credentials (secret_key, username, password) are missing from environment variables'
+      message: 'VDP API credentials (secret_key, username, password, product_group) are missing from environment variables'
     }), {
       status: 500,
       headers: {
@@ -130,11 +132,12 @@ export async function GET(request: Request, { vin }: { vin: string }) {
 
     console.log('[VIN API] Step 2: Requesting VIN report...');
     
-    // Step 2: Get VIN report using POST method with minimal headers as specified
-    const reportUrl = `https://api.vindata.com/v1/products/vind/reports/${vin.toUpperCase()}?force=true`;
+    // Step 2: Get VIN report using POST method with product group parameter
+    const reportUrl = `https://api.vindata.com/v1/products/${PRODUCT_GROUP.trim()}/reports/${vin.toUpperCase()}?force=true`;
     
     console.log(`[VIN API] Making POST request to: ${reportUrl}`);
     console.log(`[VIN API] Using Bearer token: ${authToken.substring(0, 20)}...`);
+    console.log(`[VIN API] Using product group: ${PRODUCT_GROUP.trim()}`);
     
     const vinResponse = await fetch(reportUrl, {
       method: 'POST',
@@ -174,11 +177,16 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       
       // Add specific status-based guidance
       switch (vinResponse.status) {
+        case 400:
+          if (errorText.includes('No suitable product group found')) {
+            errorMessage += ` - Please check your product group setting (${PRODUCT_GROUP}). Common values are 'vind' for VIN decoding. Verify in your VIN Data dashboard.`;
+          }
+          break;
         case 401:
           errorMessage += ' - Authentication token may have expired. Please try again';
           break;
         case 403:
-          errorMessage += ' - Access forbidden. Your account may not have access to this VIN';
+          errorMessage += ' - Access forbidden. Your account may not have access to this VIN or product group';
           break;
         case 404:
           errorMessage += ' - VIN not found in database. Please verify the VIN is correct';
