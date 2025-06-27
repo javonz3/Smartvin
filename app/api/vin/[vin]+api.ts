@@ -76,33 +76,53 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         response: errorText.substring(0, 500)
       });
       
-      let errorMessage = 'Failed to authenticate with VIN service';
+      let errorMessage = `Authentication failed with status ${tokenResponse.status}: ${tokenResponse.statusText}`;
+      let parsedError = null;
       
-      // Parse error response if possible
+      // Try to parse error response for more details
       try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch {
-        // Use status-based error messages
-        switch (tokenResponse.status) {
-          case 401:
-            errorMessage = 'Invalid API credentials. Please check your secret key, username, and password.';
-            break;
-          case 403:
-            errorMessage = 'Access forbidden. Please verify your account has API access enabled.';
-            break;
-          case 429:
-            errorMessage = 'Too many requests. Please wait a moment and try again.';
-            break;
-          default:
-            errorMessage = `Authentication failed with status ${tokenResponse.status}`;
+        parsedError = JSON.parse(errorText);
+        if (parsedError.message) {
+          errorMessage = `Authentication failed (${tokenResponse.status}): ${parsedError.message}`;
+        } else if (parsedError.error) {
+          errorMessage = `Authentication failed (${tokenResponse.status}): ${parsedError.error}`;
         }
+      } catch (parseError) {
+        // If JSON parsing fails, include raw response text for debugging
+        if (errorText && errorText.trim()) {
+          errorMessage = `Authentication failed (${tokenResponse.status}): ${errorText.substring(0, 200)}`;
+        }
+      }
+      
+      // Add specific status-based guidance while preserving detailed error info
+      switch (tokenResponse.status) {
+        case 401:
+          errorMessage += ' - Please verify your API credentials (secret key, username, and password)';
+          break;
+        case 403:
+          errorMessage += ' - Access forbidden. Please verify your account has API access enabled';
+          break;
+        case 429:
+          errorMessage += ' - Rate limit exceeded. Please wait before trying again';
+          break;
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+          errorMessage += ' - VIN service is temporarily unavailable. Please try again later';
+          break;
       }
       
       return new Response(JSON.stringify({
         success: false,
         error: `Authentication Error: ${tokenResponse.status}`,
-        message: errorMessage
+        message: errorMessage,
+        details: {
+          status: tokenResponse.status,
+          statusText: tokenResponse.statusText,
+          rawResponse: errorText ? errorText.substring(0, 500) : null,
+          parsedError: parsedError
+        }
       }), {
         status: tokenResponse.status,
         headers: {
@@ -126,7 +146,10 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       return new Response(JSON.stringify({
         success: false,
         error: 'Authentication failed',
-        message: 'No authentication token received from VIN service'
+        message: 'No authentication token received from VIN service',
+        details: {
+          tokenResponse: tokenData
+        }
       }), {
         status: 500,
         headers: {
@@ -165,36 +188,57 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         response: errorText.substring(0, 500)
       });
 
-      let errorMessage = 'Failed to get VIN report';
+      let errorMessage = `VIN report request failed with status ${vinResponse.status}: ${vinResponse.statusText}`;
+      let parsedError = null;
       
-      // Parse error response if possible
+      // Try to parse error response for more details
       try {
-        const errorData = JSON.parse(errorText);
-        errorMessage = errorData.message || errorData.error || errorMessage;
-      } catch {
-        // Use status-based error messages
-        switch (vinResponse.status) {
-          case 401:
-            errorMessage = 'Authentication token expired or invalid. Please try again.';
-            break;
-          case 403:
-            errorMessage = 'Access forbidden. Your account may not have access to this VIN.';
-            break;
-          case 404:
-            errorMessage = 'VIN not found in database. Please verify the VIN is correct.';
-            break;
-          case 429:
-            errorMessage = 'Rate limit exceeded. Please wait before making another request.';
-            break;
-          default:
-            errorMessage = `VIN report request failed with status ${vinResponse.status}`;
+        parsedError = JSON.parse(errorText);
+        if (parsedError.message) {
+          errorMessage = `VIN report failed (${vinResponse.status}): ${parsedError.message}`;
+        } else if (parsedError.error) {
+          errorMessage = `VIN report failed (${vinResponse.status}): ${parsedError.error}`;
         }
+      } catch (parseError) {
+        // If JSON parsing fails, include raw response text for debugging
+        if (errorText && errorText.trim()) {
+          errorMessage = `VIN report failed (${vinResponse.status}): ${errorText.substring(0, 200)}`;
+        }
+      }
+      
+      // Add specific status-based guidance while preserving detailed error info
+      switch (vinResponse.status) {
+        case 401:
+          errorMessage += ' - Authentication token may have expired. Please try again';
+          break;
+        case 403:
+          errorMessage += ' - Access forbidden. Your account may not have access to this VIN';
+          break;
+        case 404:
+          errorMessage += ' - VIN not found in database. Please verify the VIN is correct';
+          break;
+        case 429:
+          errorMessage += ' - Rate limit exceeded. Please wait before making another request';
+          break;
+        case 500:
+        case 502:
+        case 503:
+        case 504:
+          errorMessage += ' - VIN service is temporarily unavailable. Please try again later';
+          break;
       }
 
       return new Response(JSON.stringify({
         success: false,
-        error: `API Error: ${vinResponse.status}`,
-        message: errorMessage
+        error: `VIN Report Error: ${vinResponse.status}`,
+        message: errorMessage,
+        details: {
+          status: vinResponse.status,
+          statusText: vinResponse.statusText,
+          rawResponse: errorText ? errorText.substring(0, 500) : null,
+          parsedError: parsedError,
+          vin: vin.toUpperCase()
+        }
       }), {
         status: vinResponse.status,
         headers: {
@@ -263,17 +307,34 @@ export async function GET(request: Request, { vin }: { vin: string }) {
     console.error('[VIN API] Proxy Error:', error);
     
     let errorMessage = 'Failed to connect to VIN service';
+    let errorDetails = {};
     
     if (error instanceof TypeError && error.message.includes('fetch')) {
-      errorMessage = 'Network connection error. Please check your internet connection.';
+      errorMessage = 'Network connection error. Please check your internet connection and try again';
+      errorDetails = {
+        type: 'NetworkError',
+        originalMessage: error.message
+      };
     } else if (error instanceof Error) {
-      errorMessage = error.message;
+      errorMessage = `VIN service error: ${error.message}`;
+      errorDetails = {
+        type: error.constructor.name,
+        originalMessage: error.message,
+        stack: error.stack?.substring(0, 500)
+      };
+    } else {
+      errorMessage = 'An unexpected error occurred while processing the VIN request';
+      errorDetails = {
+        type: 'UnknownError',
+        error: String(error)
+      };
     }
     
     return new Response(JSON.stringify({
       success: false,
-      error: 'Network error',
-      message: errorMessage
+      error: 'Network/Service Error',
+      message: errorMessage,
+      details: errorDetails
     }), {
       status: 500,
       headers: {
