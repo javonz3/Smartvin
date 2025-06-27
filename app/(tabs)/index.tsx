@@ -15,8 +15,9 @@ import { router } from 'expo-router';
 import { VINScanner } from '@/components/VINScanner';
 import { PaywallModal } from '@/components/PaywallModal';
 import { UsageBanner } from '@/components/UsageBanner';
+import { VinServiceToggle } from '@/components/VinServiceToggle';
 import { LinearGradient } from 'expo-linear-gradient';
-import { VINApiService } from '@/services/vinApi';
+import { VinApiConfig } from '@/services/vinApiConfig';
 import { useSubscription } from '@/hooks/useSubscription';
 import { useTheme } from '@/contexts/ThemeContext';
 
@@ -118,8 +119,8 @@ export default function VINLookup() {
     setLoading(true);
 
     try {
-      // First, decode the VIN to get vehicle data
-      const vinResult = await VINApiService.decodeVIN(vin);
+      // Use the configured VIN service (mock or real)
+      const vinResult = await VinApiConfig.decodeVIN(vin);
       
       if (!vinResult.success) {
         // Show user-friendly error message
@@ -171,6 +172,19 @@ export default function VINLookup() {
     return await subscribe(planId);
   };
 
+  const fillTestVIN = () => {
+    const testData = VinApiConfig.getTestData();
+    if (testData && testData.availableVINs.length > 0) {
+      const randomVin = testData.availableVINs[Math.floor(Math.random() * testData.availableVINs.length)];
+      setVin(randomVin.vin);
+      validateVIN(randomVin.vin);
+      setMileage('45000');
+      Alert.alert('Test VIN Filled', `Filled with: ${randomVin.description}`);
+    } else {
+      Alert.alert('No Test Data', 'Test VINs are only available when using mock data');
+    }
+  };
+
   if (showScanner) {
     return (
       <VINScanner
@@ -206,6 +220,13 @@ export default function VINLookup() {
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* VIN Service Toggle - Only show in development */}
+        {__DEV__ && (
+          <VinServiceToggle onServiceChange={(useMock) => {
+            console.log('VIN service changed to:', useMock ? 'mock' : 'real');
+          }} />
+        )}
+
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Vehicle Information</Text>
           
@@ -245,6 +266,13 @@ export default function VINLookup() {
                 <CheckCircle size={16} color={theme.colors.success} />
                 <Text style={styles.successText}>Valid VIN format</Text>
               </View>
+            )}
+            
+            {/* Test VIN button - Only show in development with mock data */}
+            {__DEV__ && VinApiConfig.getConfig().useMockData && (
+              <TouchableOpacity style={styles.testVinButton} onPress={fillTestVIN}>
+                <Text style={styles.testVinButtonText}>Fill Test VIN</Text>
+              </TouchableOpacity>
             )}
           </View>
 
@@ -487,6 +515,19 @@ const createStyles = (theme: any) => StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Inter-Medium',
     color: theme.colors.success,
+  },
+  testVinButton: {
+    backgroundColor: theme.colors.primary + '15',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 8,
+    marginTop: 8,
+    alignSelf: 'flex-start',
+  },
+  testVinButtonText: {
+    fontSize: 12,
+    fontFamily: 'Inter-SemiBold',
+    color: theme.colors.primary,
   },
   zipInputContainer: {
     flexDirection: 'row',
