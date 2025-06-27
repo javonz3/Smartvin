@@ -1,24 +1,35 @@
 export async function GET(request: Request, { vin }: { vin: string }) {
   console.log(`[VIN API] Processing request for VIN: ${vin}`);
   
+  // Access environment variables correctly for API routes
   const SECRET_KEY = process.env.EXPO_PUBLIC_VDP_API_KEY;
   const USERNAME = process.env.EXPO_PUBLIC_VDP_USERNAME;
   const PASSWORD = process.env.EXPO_PUBLIC_VDP_PASSWORD;
   const PRODUCT_GROUP = process.env.EXPO_PUBLIC_VDP_PRODUCT_GROUP;
   
+  console.log('[VIN API] Environment variables check:', {
+    hasSecretKey: !!SECRET_KEY,
+    hasUsername: !!USERNAME,
+    hasPassword: !!PASSWORD,
+    hasProductGroup: !!PRODUCT_GROUP,
+    secretKeyLength: SECRET_KEY?.length || 0,
+    usernameValue: USERNAME || 'MISSING',
+    productGroupValue: PRODUCT_GROUP || 'MISSING'
+  });
+  
   // Check if all required credentials are present
   if (!SECRET_KEY || !USERNAME || !PASSWORD || !PRODUCT_GROUP) {
-    console.error('[VIN API] Missing credentials:', {
-      hasSecretKey: !!SECRET_KEY,
-      hasUsername: !!USERNAME,
-      hasPassword: !!PASSWORD,
-      hasProductGroup: !!PRODUCT_GROUP
+    console.error('[VIN API] Missing credentials - detailed check:', {
+      SECRET_KEY: SECRET_KEY ? `${SECRET_KEY.substring(0, 10)}...` : 'MISSING',
+      USERNAME: USERNAME || 'MISSING',
+      PASSWORD: PASSWORD ? '***PRESENT***' : 'MISSING',
+      PRODUCT_GROUP: PRODUCT_GROUP || 'MISSING'
     });
     
     return new Response(JSON.stringify({
       success: false,
       error: 'API credentials not configured',
-      message: 'VDP API credentials (secret_key, username, password, product_group) are missing from environment variables'
+      message: 'VDP API credentials (secret_key, username, password, product_group) are missing from environment variables. Please check your .env file and restart the development server.'
     }), {
       status: 500,
       headers: {
@@ -47,14 +58,19 @@ export async function GET(request: Request, { vin }: { vin: string }) {
   try {
     console.log('[VIN API] Step 1: Authenticating with VIN Data API...');
     
-    // Prepare authentication payload - ensure clean data and correct parameter names
+    // Prepare authentication payload with actual values
     const authPayload = {
       secret_key: SECRET_KEY.trim(),
       username: USERNAME.trim(),
       password: PASSWORD.trim()
     };
     
-    console.log('[VIN API] Authentication payload prepared with parameters:', Object.keys(authPayload));
+    console.log('[VIN API] Authentication payload being sent:', {
+      secret_key: `${SECRET_KEY.substring(0, 10)}...`,
+      username: USERNAME,
+      password: '***HIDDEN***',
+      payloadKeys: Object.keys(authPayload)
+    });
     
     // Step 1: Get authentication token
     const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
@@ -74,10 +90,10 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         status: tokenResponse.status,
         statusText: tokenResponse.statusText,
         response: errorText.substring(0, 500),
-        sentPayload: {
+        sentCredentials: {
           secret_key: SECRET_KEY ? `${SECRET_KEY.substring(0, 10)}...` : 'MISSING',
           username: USERNAME || 'MISSING',
-          password: PASSWORD ? '***' : 'MISSING'
+          password: PASSWORD ? '***PRESENT***' : 'MISSING'
         }
       });
       
