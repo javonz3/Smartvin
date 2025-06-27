@@ -47,22 +47,21 @@ export async function GET(request: Request, { vin }: { vin: string }) {
   try {
     console.log('[VIN API] Step 1: Authenticating with VIN Data API...');
     
-    // Prepare authentication payload - ensure clean data
+    // Prepare authentication payload - ensure clean data and correct parameter names
     const authPayload = {
       secret_key: SECRET_KEY.trim(),
       username: USERNAME.trim(),
       password: PASSWORD.trim()
     };
     
-    console.log('[VIN API] Authentication payload prepared (credentials masked)');
+    console.log('[VIN API] Authentication payload prepared with parameters:', Object.keys(authPayload));
     
-    // Step 1: Get authentication token with minimal headers
+    // Step 1: Get authentication token
     const tokenResponse = await fetch('https://api.vindata.com/v1/token', {
       method: 'POST',
       headers: {
-        'accept': '*/*',
-        'accept-encoding': 'gzip, deflate, br, zstd',
-        'content-type': 'application/json'
+        'Accept': 'application/json',
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify(authPayload)
     });
@@ -74,7 +73,12 @@ export async function GET(request: Request, { vin }: { vin: string }) {
       console.error(`[VIN API] Authentication failed:`, {
         status: tokenResponse.status,
         statusText: tokenResponse.statusText,
-        response: errorText.substring(0, 500)
+        response: errorText.substring(0, 500),
+        sentPayload: {
+          secret_key: SECRET_KEY ? `${SECRET_KEY.substring(0, 10)}...` : 'MISSING',
+          username: USERNAME || 'MISSING',
+          password: PASSWORD ? '***' : 'MISSING'
+        }
       });
       
       let errorMessage = `Authentication failed with status ${tokenResponse.status}: ${tokenResponse.statusText}`;
@@ -91,6 +95,25 @@ export async function GET(request: Request, { vin }: { vin: string }) {
         if (errorText && errorText.trim()) {
           errorMessage = `Authentication failed (${tokenResponse.status}): ${errorText.substring(0, 200)}`;
         }
+      }
+      
+      // Add specific guidance for 403 errors
+      if (tokenResponse.status === 403) {
+        errorMessage += `
+
+CREDENTIAL VERIFICATION REQUIRED:
+1. Log in to your VIN Data dashboard: https://vindata.com/dashboard
+2. Navigate to the API section
+3. Verify your Secret Key (API Key) is correct
+4. Ensure your username and password are exactly as shown in the dashboard
+5. Check that your account is active and has API access
+6. Update your .env file with the correct credentials
+7. Restart the development server
+
+Current credential status:
+- Secret Key: ${SECRET_KEY ? 'Present' : 'MISSING'}
+- Username: ${USERNAME ? 'Present' : 'MISSING'}  
+- Password: ${PASSWORD ? 'Present' : 'MISSING'}`;
       }
       
       return new Response(JSON.stringify({
@@ -142,10 +165,9 @@ export async function GET(request: Request, { vin }: { vin: string }) {
     const vinResponse = await fetch(reportUrl, {
       method: 'POST',
       headers: {
-        'accept': '*/*',
-        'accept-encoding': 'gzip, deflate, br, zstd',
-        'content-type': 'application/json',
-        'authorization': `Bearer ${authToken}`
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`
       }
     });
 
