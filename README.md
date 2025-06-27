@@ -239,25 +239,6 @@ services/
    - Ensure you're in development mode (`__DEV__` is true)
    - Check that the VinServiceToggle component is visible
 
-## Testing
-
-### Manual Testing with Mock Data
-
-1. Use the provided test VINs for different vehicle types
-2. Test error scenarios with special error VINs
-3. Verify the service toggle works correctly
-4. Test the "Fill Test VIN" button functionality
-
-### Automated Testing
-
-```bash
-# Run the comprehensive test suite
-npm run test
-
-# Test OpenAI integration specifically
-npm run test:openai
-```
-
 ## Deployment
 
 ### Development/Staging
