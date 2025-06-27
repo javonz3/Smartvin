@@ -28,6 +28,7 @@ export interface ValuationResponse {
 export class ValuationService {
   private static readonly OPENAI_API_KEY = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
   private static readonly OPENAI_URL = 'https://api.openai.com/v1/chat/completions';
+  private static readonly MODELS = ['gpt-4', 'gpt-3.5-turbo'];
 
   static async getValuation(request: ValuationRequest): Promise<{
     success: boolean;
@@ -44,50 +45,88 @@ export class ValuationService {
     try {
       const prompt = this.buildValuationPrompt(request);
       
-      const response = await fetch(this.OPENAI_URL, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${this.OPENAI_API_KEY}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          model: 'gpt-4',
-          messages: [
-            {
-              role: 'system',
-              content: 'You are an expert automotive appraiser with 20+ years of experience in vehicle valuation for dealers, auctions, and BHPH lots. Provide accurate, market-based valuations with detailed insights.'
+      // Try each model in order until one works
+      for (const model of this.MODELS) {
+        try {
+          const response = await fetch(this.OPENAI_URL, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${this.OPENAI_API_KEY}`,
+              'Content-Type': 'application/json'
             },
-            {
-              role: 'user',
-              content: prompt
+            body: JSON.stringify({
+              model: model,
+              messages: [
+                {
+                  role: 'system',
+                  content: 'You are an expert automotive appraiser with 20+ years of experience in vehicle valuation for dealers, auctions, and BHPH lots. Provide accurate, market-based valuations with detailed insights.'
+                },
+                {
+                  role: 'user',
+                  content: prompt
+                }
+              ],
+              temperature: 0.3,
+              max_tokens: 1000
+            })
+          });
+
+          if (response.ok) {
+            const data = await response.json();
+            const aiResponse = data.choices[0]?.message?.content;
+
+            if (!aiResponse) {
+              throw new Error('No response from AI service');
             }
-          ],
-          temperature: 0.3,
-          max_tokens: 1000
-        })
-      });
 
-      if (!response.ok) {
-        throw new Error(`OpenAI API error: ${response.status}`);
+            return {
+              success: true,
+              data: this.parseAIResponse(aiResponse, request)
+            };
+          } else if (response.status === 404) {
+            // Model not available, try next model
+            console.warn(`Model ${model} not available (404), trying next model...`);
+            continue;
+          } else {
+            throw new Error(`OpenAI API error: ${response.status}`);
+          }
+        } catch (error) {
+          // If this is the last model and it failed, throw the error
+          if (model === this.MODELS[this.MODELS.length - 1]) {
+            throw error;
+          }
+          // Otherwise, try the next model
+          console.warn(`Model ${model} failed, trying next model...`, error);
+          continue;
+        }
       }
 
-      const data = await response.json();
-      const aiResponse = data.choices[0]?.message?.content;
-
-      if (!aiResponse) {
-        throw new Error('No response from AI service');
-      }
-
-      return {
-        success: true,
-        data: this.parseAIResponse(aiResponse, request)
-      };
+      // If all models failed, fall back to local calculation
+      throw new Error('All OpenAI models unavailable');
 
     } catch (error) {
       console.error('Valuation API Error:', error);
+      
+      // Return fallback valuation when API fails
+      const fallbackData = this.calculateFallbackValuation(request);
+      
       return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Failed to get valuation'
+        success: true,
+        data: {
+          wholesale: fallbackData.wholesale,
+          tradeIn: fallbackData.tradeIn,
+          retail: fallbackData.retail,
+          bhph: fallbackData.bhph,
+          confidence: 60,
+          marketTrend: 'stable' as const,
+          aiInsight: 'Valuation calculated using standard depreciation models. AI-powered insights are temporarily unavailable.',
+          factors: {
+            mileageImpact: -10,
+            conditionImpact: request.condition === 'Excellent' ? 5 : request.condition === 'Good' ? 0 : -15,
+            accidentImpact: request.accidentHistory === 'None' ? 0 : -20,
+            marketDemand: 'Medium'
+          }
+        }
       };
     }
   }
